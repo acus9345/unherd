@@ -1,0 +1,26 @@
+# Production SaaS Fleet Crontab (16 scheduled workers)
+# Classic engineering anti-pattern: human-written schedules cluster heavily on :00 and */5
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# High-frequency telemetry & cache workers
+*/5 * * * *  /srv/bin/sync-stripe-webhooks --batch=500       # name=stripe-webhook-sync weight=2.5 duration=18s
+*/5 * * * *  /srv/bin/flush-redis-clickstream --shards=8     # name=redis-clickstream-flush weight=2.0 duration=14s
+*/5 * * * *  /srv/bin/poll-partner-inventory --timeout=10    # name=partner-inventory-poll weight=1.5 duration=12s
+*/10 * * * * /srv/bin/recompute-leaderboard-ranks            # name=leaderboard-recompute weight=2.2 duration=22s
+*/10 * * * * /srv/bin/outbox-relay-dispatcher                # name=outbox-relay weight=1.8 duration=10s
+*/15 * * * * /srv/bin/refresh-materialized-views --concurrent # name=pg-matview-refresh weight=3.5 duration=35s
+*/15 * * * * /srv/bin/sync-search-index --incremental        # name=meilisearch-delta-sync weight=2.4 duration=20s
+*/30 * * * * /srv/bin/prune-expired-oauth-tokens             # name=oauth-token-prune weight=1.2 duration=15s
+
+# Hourly rollup & billing workers (all stacked at minute :00!)
+0 * * * *    /srv/bin/aggregate-tenant-usage-meters          # name=tenant-usage-rollup weight=3.2 duration=40s
+0 * * * *    /srv/bin/generate-hourly-invoice-drafts         # name=invoice-draft-gen weight=2.8 duration=30s
+0 * * * *    /srv/bin/export-snowflake-cdc-snapshot          # name=snowflake-cdc-export weight=3.0 duration=45s
+0 * * * *    /srv/bin/evaluate-slo-burn-rate-alerts          # name=slo-burn-evaluator weight=1.5 duration=12s
+
+# Multi-hour & daily maintenance (all stacked at 00:00 UTC!)
+0 */4 * * *  /srv/bin/compact-timeseries-partitions          # name=tsdb-partition-compact weight=3.8 duration=50s
+0 0 * * *    /srv/bin/pg-vacuum-analyze-ledger               # name=pg-nightly-vacuum weight=4.5 duration=90s
+0 0 * * *    /srv/bin/build-executive-arr-cohort-report      # name=arr-cohort-report weight=3.0 duration=45s
+0 0 * * *    /srv/bin/regulatory-audit-log-seal              # name=audit-log-merkle-seal weight=2.0 duration=20s pinned

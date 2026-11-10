@@ -1,0 +1,41 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: k8s-billing-usage-aggregator
+spec:
+  schedule: "0 * * * *" # weight=3.2 duration=35s
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: k8s-clickhouse-etl-sync
+spec:
+  schedule: "*/5 * * * *" # weight=2.6 duration=20s
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: k8s-redis-session-gc
+spec:
+  schedule: "*/5 * * * *" # weight=1.8 duration=15s
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: k8s-vector-embeddings-indexer
+spec:
+  schedule: "*/15 * * * *" # weight=3.5 duration=40s
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: k8s-stripe-reconciliation
+spec:
+  schedule: "0 * * * *" # weight=2.9 duration=25s
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: k8s-rds-snapshot-verifier
+spec:
+  schedule: "0 0 * * *" # weight=4.0 duration=60s

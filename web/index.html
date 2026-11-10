@@ -1,0 +1,2476 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="paper">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UNHERD // Distributed Cron Collision Analyzer &amp; Phase-Shift Solver</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root, [data-theme="paper"] {
+      --bg-chassis: #F2EFE9;
+      --bg-panel: #FAF8F3;
+      --bg-elevated: #EAE5DC;
+      --bg-code: #161615;
+      --ink-primary: #141413;
+      --ink-secondary: #57544C;
+      --ink-muted: #858075;
+      --rule-hairline: #CFC9BC;
+      --rule-heavy: #141413;
+      --sig-danger: #D4381C;
+      --sig-danger-soft: rgba(212, 56, 28, 0.12);
+      --sig-ok: #156840;
+      --sig-ok-soft: rgba(21, 104, 64, 0.13);
+      --sig-warn: #B86B00;
+      --sig-warn-soft: rgba(184, 107, 0, 0.14);
+      --sig-cobalt: #1E40AF;
+      --canvas-grid: rgba(20, 20, 19, 0.08);
+    }
+
+    [data-theme="crt"] {
+      --bg-chassis: #0D0E0C;
+      --bg-panel: #141613;
+      --bg-elevated: #1D201B;
+      --bg-code: #080907;
+      --ink-primary: #E8E3D5;
+      --ink-secondary: #9E998B;
+      --ink-muted: #666257;
+      --rule-hairline: #2B2E28;
+      --rule-heavy: #E8E3D5;
+      --sig-danger: #FF5226;
+      --sig-danger-soft: rgba(255, 82, 38, 0.16);
+      --sig-ok: #28C76F;
+      --sig-ok-soft: rgba(40, 199, 111, 0.16);
+      --sig-warn: #F59E0B;
+      --sig-warn-soft: rgba(245, 158, 11, 0.16);
+      --sig-cobalt: #60A5FA;
+      --canvas-grid: rgba(232, 227, 213, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+      border-radius: 0px;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-chassis);
+      color: var(--ink-primary);
+      font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    .font-mono-tech {
+      font-family: 'JetBrains Mono', monospace;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .font-display-tech {
+      font-family: 'Space Grotesk', sans-serif;
+      letter-spacing: -0.02em;
+    }
+
+    .hairline-border {
+      border: 1px solid var(--rule-hairline);
+    }
+
+    .hairline-t { border-top: 1px solid var(--rule-hairline); }
+    .hairline-b { border-bottom: 1px solid var(--rule-hairline); }
+    .hairline-l { border-left: 1px solid var(--rule-hairline); }
+    .hairline-r { border-right: 1px solid var(--rule-hairline); }
+
+    .heavy-rule-t { border-top: 2px solid var(--rule-heavy); }
+    .heavy-rule-b { border-bottom: 2px solid var(--rule-heavy); }
+
+    .panel-surface {
+      background-color: var(--bg-panel);
+    }
+
+    .elevated-surface {
+      background-color: var(--bg-elevated);
+    }
+
+    /* Tactile hardware button */
+    .hw-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 6px 11px;
+      border: 1px solid var(--ink-primary);
+      background-color: var(--bg-panel);
+      color: var(--ink-primary);
+      cursor: pointer;
+      transition: transform 60ms ease, background-color 90ms ease, color 90ms ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+
+    .hw-btn:hover {
+      background-color: var(--bg-elevated);
+    }
+
+    .hw-btn:active {
+      transform: translateY(1px);
+    }
+
+    .hw-btn-primary {
+      background-color: var(--ink-primary);
+      color: var(--bg-panel);
+    }
+
+    .hw-btn-primary:hover {
+      background-color: var(--sig-danger);
+      border-color: var(--sig-danger);
+      color: #FFFFFF;
+    }
+
+    .hw-btn-active {
+      background-color: var(--ink-primary);
+      color: var(--bg-panel);
+    }
+
+    .hw-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: 1px solid var(--rule-hairline);
+    }
+
+    /* Custom technical inputs */
+    .tech-input {
+      background-color: var(--bg-chassis);
+      color: var(--ink-primary);
+      border: 1px solid var(--rule-hairline);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      padding: 5px 8px;
+      outline: none;
+    }
+
+    .tech-input:focus {
+      border-color: var(--ink-primary);
+      background-color: var(--bg-panel);
+    }
+
+    /* Blueprint crosshair corner ornament */
+    .corner-tick {
+      position: relative;
+    }
+    .corner-tick::after {
+      content: "+";
+      position: absolute;
+      top: -7px;
+      right: -5px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--ink-muted);
+      pointer-events: none;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-chassis);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--ink-muted);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-[#D4381C] selection:text-white">
+
+  <!-- TOP INSTRUMENT TELEMETRY BAR -->
+  <header class="heavy-rule-b panel-surface sticky top-0 z-30">
+    <div class="max-w-[1560px] mx-auto px-3 sm:px-5 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="px-2 py-0.5 bg-[var(--ink-primary)] text-[var(--bg-panel)] font-mono-tech font-bold text-xs tracking-widest">
+          UNHERD // v0.1.0
+        </div>
+        <div>
+          <h1 class="font-display-tech font-bold text-sm sm:text-base tracking-tight leading-none">
+            DISTRIBUTED CRON COLLISION ANALYZER &amp; PHASE-SHIFT SOLVER
+          </h1>
+          <p class="font-mono-tech text-[11px] text-[var(--ink-secondary)] mt-0.5">
+            STATIC DE-SYNCHRONIZER FOR POSIX CRONTAB, KUBERNETES CRONJOB &amp; GITHUB ACTIONS
+          </p>
+        </div>
+      </div>
+
+      <!-- Right Hardware Controls -->
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="hidden md:flex items-center gap-1.5 mr-2 font-mono-tech text-[11px] text-[var(--ink-secondary)]">
+          <span class="inline-block w-2 h-2 bg-[#156840]"></span>
+          <span>INVARIANT: CADENCE &amp; DAILY RUNS PRESERVED</span>
+        </div>
+
+        <button id="btnToggleHourShift" type="button" class="hw-btn" title="Allow daily &amp; multi-hour jobs to shift hour windows">
+          <span id="hourShiftIndicator" class="w-2 h-2 border border-current inline-block"></span>
+          <span>HOUR-SHIFT: OFF</span>
+        </button>
+
+        <button id="btnRunOptimizer" type="button" class="hw-btn hw-btn-primary">
+          <span>&#9654; RUN PHASE-SHIFT SOLVER</span>
+        </button>
+
+        <button id="btnToggleTheme" type="button" class="hw-btn" title="Switch between Archival Paper and Tektronix CRT chassis">
+          <span id="themeLabel">CHASSIS: PAPER</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- SUB-BAR: PRESET SELECTOR & VIEW ROUTER -->
+  <div class="hairline-b elevated-surface">
+    <div class="max-w-[1560px] mx-auto px-3 sm:px-5 py-2 flex flex-wrap items-center justify-between gap-2">
+      <!-- Fleet Presets -->
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="font-mono-tech text-[11px] font-semibold text-[var(--ink-secondary)] mr-1">
+          LOAD FLEET FIXTURE:
+        </span>
+        <button type="button" data-preset="saas" class="preset-btn hw-btn hw-btn-active">
+          01 / PROD-SAAS-16 (CRONTAB)
+        </button>
+        <button type="button" data-preset="k8s" class="preset-btn hw-btn">
+          02 / K8S-DATA-PLATFORM (YAML)
+        </button>
+        <button type="button" data-preset="gha" class="preset-btn hw-btn">
+          03 / GHA-MONOREPO-CI (WORKFLOW)
+        </button>
+        <button type="button" data-preset="fintech" class="preset-btn hw-btn">
+          04 / FINTECH-LEDGER-HERD
+        </button>
+      </div>
+
+      <!-- Mode / Trace Switcher -->
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="font-mono-tech text-[11px] font-semibold text-[var(--ink-secondary)] mr-1">
+          OSCILLOSCOPE TRACE:
+        </span>
+        <button type="button" data-trace="overlay" class="trace-btn hw-btn hw-btn-active">
+          DUAL OVERLAY (A/B)
+        </button>
+        <button type="button" data-trace="before" class="trace-btn hw-btn">
+          CH1: RAW HERD
+        </button>
+        <button type="button" data-trace="after" class="trace-btn hw-btn">
+          CH2: UNHERD SOLVED
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN WORKBENCH GRID -->
+  <main class="max-w-[1560px] w-full mx-auto px-3 sm:px-5 py-4 flex-1 flex flex-col gap-4">
+
+    <!-- ROW 1: 6-CELL INSTRUMENT READOUT STRIP -->
+    <section aria-label="Telemetry Readout Strip" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 hairline-border panel-surface">
+      <!-- Metric 01 -->
+      <div class="p-3 hairline-r hairline-b lg:border-b-0 corner-tick">
+        <div class="font-mono-tech text-[10px] text-[var(--ink-muted)] uppercase tracking-wider">
+          01 // PEAK CONCURRENCY
+        </div>
+        <div class="mt-1 flex items-baseline gap-2 font-mono-tech">
+          <span id="kpiPeakBefore" class="text-xl sm:text-2xl font-bold text-[var(--sig-danger)] line-through opacity-80">14</span>
+          <span class="text-xs text-[var(--ink-muted)]">&rarr;</span>
+          <span id="kpiPeakAfter" class="text-2xl sm:text-3xl font-bold text-[var(--sig-ok)]">2</span>
+          <span class="text-[11px] text-[var(--ink-secondary)]">jobs/min</span>
+        </div>
+        <div id="kpiPeakDelta" class="mt-1 font-mono-tech text-[11px] text-[var(--sig-ok)] font-semibold">
+          -85.7% PEAK COLLISION DROP
+        </div>
+      </div>
+
+      <!-- Metric 02 -->
+      <div class="p-3 hairline-r hairline-b lg:border-b-0 corner-tick">
+        <div class="font-mono-tech text-[10px] text-[var(--ink-muted)] uppercase tracking-wider">
+          02 // PEAK WEIGHTED LOAD
+        </div>
+        <div class="mt-1 flex items-baseline gap-2 font-mono-tech">
+          <span id="kpiLoadBefore" class="text-xl sm:text-2xl font-bold text-[var(--sig-danger)] line-through opacity-80">35.6</span>
+          <span class="text-xs text-[var(--ink-muted)]">&rarr;</span>
+          <span id="kpiLoadAfter" class="text-2xl sm:text-3xl font-bold text-[var(--sig-ok)]">6.5</span>
+          <span class="text-[11px] text-[var(--ink-secondary)]">WU</span>
+        </div>
+        <div id="kpiLoadDelta" class="mt-1 font-mono-tech text-[11px] text-[var(--sig-ok)] font-semibold">
+          -81.7% DB IOPS SPIKE REDUCTION
+        </div>
+      </div>
+
+      <!-- Metric 03 -->
+      <div class="p-3 hairline-r hairline-b sm:border-b-0 corner-tick">
+        <div class="font-mono-tech text-[10px] text-[var(--ink-muted)] uppercase tracking-wider">
+          03 // PEAK-TO-AVG RATIO (PAR)
+        </div>
+        <div class="mt-1 flex items-baseline gap-2 font-mono-tech">
+          <span id="kpiParBefore" class="text-xl sm:text-2xl font-bold text-[var(--sig-danger)]">13.4x</span>
+          <span class="text-xs text-[var(--ink-muted)]">&rarr;</span>
+          <span id="kpiParAfter" class="text-2xl sm:text-3xl font-bold text-[var(--ink-primary)]">2.4x</span>
+        </div>
+        <div class="mt-1 font-mono-tech text-[11px] text-[var(--ink-secondary)]">
+          IDEAL FLATLINE TARGET: 1.0x..2.5x
+        </div>
+      </div>
+
+      <!-- Metric 04 -->
+      <div class="p-3 hairline-r hairline-b sm:border-b-0 corner-tick">
+        <div class="font-mono-tech text-[10px] text-[var(--ink-muted)] uppercase tracking-wider">
+          04 // MINUTE :00 PILEUP
+        </div>
+        <div class="mt-1 flex items-baseline gap-2 font-mono-tech">
+          <span id="kpiMinZeroBefore" class="text-xl sm:text-2xl font-bold text-[var(--sig-warn)]">26.4%</span>
+          <span class="text-xs text-[var(--ink-muted)]">&rarr;</span>
+          <span id="kpiMinZeroAfter" class="text-2xl sm:text-3xl font-bold text-[var(--ink-primary)]">1.6%</span>
+        </div>
+        <div class="mt-1 font-mono-tech text-[11px] text-[var(--ink-secondary)]">
+          UNIFORM BASELINE: 1.67% (1/60)
+        </div>
+      </div>
+
+      <!-- Metric 05 -->
+      <div class="p-3 hairline-r corner-tick">
+        <div class="font-mono-tech text-[10px] text-[var(--ink-muted)] uppercase tracking-wider">
+          05 // COLLISION MINUTES (&ge;2 JOBS)
+        </div>
+        <div class="mt-1 flex items-baseline gap-2 font-mono-tech">
+          <span id="kpiCollMinsBefore" class="text-xl sm:text-2xl font-bold text-[var(--sig-danger)]">288</span>
+          <span class="text-xs text-[var(--ink-muted)]">&rarr;</span>
+          <span id="kpiCollMinsAfter" class="text-2xl sm:text-3xl font-bold text-[var(--sig-ok)]">42</span>
+          <span class="text-[11px] text-[var(--ink-secondary)]">/ 1440m</span>
+        </div>
+        <div id="kpiSevereSummary" class="mt-1 font-mono-tech text-[11px] text-[var(--ink-secondary)]">
+          SEVERE (&ge;4 JOBS): 96 &rarr; 0 MINS
+        </div>
+      </div>
+
+      <!-- Metric 06 -->
+      <div class="p-3 corner-tick">
+        <div class="font-mono-tech text-[10px] text-[var(--ink-muted)] uppercase tracking-wider">
+          06 // SLA CADENCE INVARIANT
+        </div>
+        <div class="mt-1 flex items-baseline gap-2 font-mono-tech">
+          <span id="kpiTotalRunsBefore" class="text-2xl sm:text-3xl font-bold text-[var(--ink-primary)]">1,229</span>
+          <span class="text-xs text-[var(--sig-ok)] font-bold">==</span>
+          <span id="kpiTotalRunsAfter" class="text-2xl sm:text-3xl font-bold text-[var(--sig-ok)]">1,229</span>
+        </div>
+        <div class="mt-1 font-mono-tech text-[11px] text-[var(--sig-ok)] font-semibold">
+          &#10003; 100% DAILY EXECUTIONS PRESERVED
+        </div>
+      </div>
+    </section>
+
+    <!-- ROW 2: PRIMARY OSCILLOSCOPE + INTRA-HOUR 60-MINUTE MODULO MATRIX -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+      <!-- LEFT 8 COLS: 1,440-MINUTE DIURNAL TEMPORAL DENSITY OSCILLOSCOPE -->
+      <section class="lg:col-span-8 hairline-border panel-surface flex flex-col">
+        <div class="px-3.5 py-2.5 hairline-b elevated-surface flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="hw-tag bg-[var(--ink-primary)] text-[var(--bg-panel)]">SEC-01</span>
+            <h2 class="font-display-tech font-bold text-sm uppercase tracking-tight">
+              DIURNAL TEMPORAL COLLISION OSCILLOSCOPE (1,440 MINUTES // UTC)
+            </h2>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-1.5">
+            <span class="font-mono-tech text-[10px] text-[var(--ink-secondary)] mr-1">TIMEBASE ZOOM:</span>
+            <button type="button" data-zoom="24h" class="zoom-btn hw-btn hw-btn-active">24H FULL (1440M)</button>
+            <button type="button" data-zoom="6h" class="zoom-btn hw-btn">00:00..06:00 (360M)</button>
+            <button type="button" data-zoom="1h" class="zoom-btn hw-btn">00:00..01:00 (60M)</button>
+          </div>
+        </div>
+
+        <!-- Oscilloscope Canvas Container -->
+        <div class="p-3 flex-1 flex flex-col justify-between">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2 font-mono-tech text-[11px]">
+            <div class="flex items-center gap-4">
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-3 h-0.5 bg-[var(--sig-danger)] inline-block"></span>
+                <span class="text-[var(--ink-secondary)]">CH1: BASELINE HERD (WEIGHTED LOAD)</span>
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-3 h-0.5 bg-[var(--sig-ok)] inline-block"></span>
+                <span class="text-[var(--ink-secondary)]">CH2: UNHERD PHASE-SHIFTED</span>
+              </span>
+            </div>
+            <div id="oscHoverReadout" class="text-[var(--ink-primary)] font-semibold">
+              CURSOR: 00:00 UTC // BASELINE: 14 JOBS (35.6 WU) &rarr; UNHERD: 2 JOBS (6.0 WU)
+            </div>
+          </div>
+
+          <div class="relative w-full h-64 sm:h-72 hairline-border bg-[var(--bg-chassis)]">
+            <canvas id="oscilloscopeCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+          </div>
+
+          <!-- Active Minute Collision Inspector Strip -->
+          <div class="mt-2.5 p-2.5 hairline-border elevated-surface flex flex-col sm:flex-row sm:items-center justify-between gap-2 font-mono-tech text-xs">
+            <div>
+              <span class="text-[var(--ink-muted)]">INSPECTING SLOT:</span>
+              <strong id="inspectedTimeSlot" class="ml-1 text-[var(--ink-primary)]">00:00 UTC (MINUTE 0)</strong>
+              <span id="inspectedSlotCounts" class="ml-2 text-[var(--sig-danger)] font-semibold">
+                [BEFORE: 14 CONCURRENT | AFTER: 2 CONCURRENT]
+              </span>
+            </div>
+            <div id="inspectedJobPills" class="flex flex-wrap gap-1"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT 4 COLS: 60-MINUTE INTRA-HOUR MODULO HEATMAP (00..59) -->
+      <section class="lg:col-span-4 hairline-border panel-surface flex flex-col">
+        <div class="px-3.5 py-2.5 hairline-b elevated-surface flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="hw-tag bg-[var(--ink-primary)] text-[var(--bg-panel)]">SEC-02</span>
+            <h2 class="font-display-tech font-bold text-sm uppercase tracking-tight">
+              INTRA-HOUR MODULO 60 MATRIX (:00..:59)
+            </h2>
+          </div>
+          <button id="btnToggleMatrixMode" type="button" class="hw-btn">
+            <span id="matrixModeLabel">VIEW: AFTER UNHERD</span>
+          </button>
+        </div>
+
+        <div class="p-3 flex-1 flex flex-col justify-between">
+          <p class="font-mono-tech text-[11px] text-[var(--ink-secondary)] mb-2 leading-relaxed">
+            Human cron expressions cluster on <code class="px-1 elevated-surface">:00</code>, <code class="px-1 elevated-surface">:15</code>, <code class="px-1 elevated-surface">:30</code>, and <code class="px-1 elevated-surface">*/5</code>. Click any minute cell <code class="px-1 elevated-surface">:00..:59</code> to inspect jobs firing on that minute-of-hour modulus.
+          </p>
+
+          <!-- 10 x 6 Grid of minutes :00 to :59 -->
+          <div id="moduloGrid" class="grid grid-cols-10 gap-1 font-mono-tech text-[11px] my-auto"></div>
+
+          <!-- Legend & Selected Minute Modulo Details -->
+          <div class="mt-3 pt-2.5 hairline-t font-mono-tech text-[11px]">
+            <div class="flex items-center justify-between text-[10px] text-[var(--ink-muted)] mb-1.5">
+              <span>DENSITY SCALE (DAILY TRIGGERS @ :MM):</span>
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 inline-block hairline-border bg-[var(--bg-chassis)]"></span>0</span>
+                <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 inline-block bg-[#156840]/35"></span>1-2</span>
+                <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 inline-block bg-[#B86B00]/55"></span>3-5</span>
+                <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 inline-block bg-[#D4381C]"></span>6+ HERD</span>
+              </div>
+            </div>
+            <div id="moduloMinuteDetail" class="p-2 hairline-border bg-[var(--bg-chassis)] text-[11px] truncate">
+              MINUTE :00 // Select any cell above to inspect modulo fire count.
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- ROW 3: FLEET SCHEDULE WORKBENCH & LIVE CONFIG / UNIFIED DIFF PATCH -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+      <!-- LEFT 7 COLS: INTERACTIVE FLEET SCHEDULE TABLE + ADD/PIN CONTROLS -->
+      <section class="lg:col-span-7 hairline-border panel-surface flex flex-col">
+        <div class="px-3.5 py-2.5 hairline-b elevated-surface flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="hw-tag bg-[var(--ink-primary)] text-[var(--bg-panel)]">SEC-03</span>
+            <h2 class="font-display-tech font-bold text-sm uppercase tracking-tight">
+              FLEET SCHEDULE MATRIX &amp; SLA PINNING (<span id="jobCountBadge">16</span> JOBS)
+            </h2>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <button id="btnAddJobToggle" type="button" class="hw-btn">
+              + ADD SCHEDULED JOB
+            </button>
+            <button id="btnResetPinned" type="button" class="hw-btn" title="Unpin all jobs">
+              UNLOCK ALL
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsible Add Job Inline Bar -->
+        <div id="addJobDrawer" class="hidden px-3.5 py-2.5 hairline-b bg-[var(--bg-chassis)]">
+          <form id="addJobForm" class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end font-mono-tech text-xs">
+            <div class="sm:col-span-4">
+              <label for="inputNewJobName" class="block text-[10px] text-[var(--ink-secondary)] mb-1">JOB IDENTIFIER</label>
+              <input id="inputNewJobName" type="text" value="webhook-dlq-replay" required class="tech-input w-full" placeholder="e.g. billing-rollup" />
+            </div>
+            <div class="sm:col-span-3">
+              <label for="inputNewJobCron" class="block text-[10px] text-[var(--ink-secondary)] mb-1">POSIX CRON / @MACRO</label>
+              <input id="inputNewJobCron" type="text" value="*/5 * * * *" required class="tech-input w-full" placeholder="*/5 * * * *" />
+            </div>
+            <div class="sm:col-span-2">
+              <label for="inputNewJobWeight" class="block text-[10px] text-[var(--ink-secondary)] mb-1">LOAD WEIGHT</label>
+              <input id="inputNewJobWeight" type="number" step="0.5" min="0.5" max="20" value="2.5" required class="tech-input w-full" />
+            </div>
+            <div class="sm:col-span-3 flex gap-1.5">
+              <button type="submit" class="hw-btn hw-btn-primary w-full justify-center">INSERT JOB</button>
+            </div>
+          </form>
+          <div id="addJobError" class="hidden mt-1.5 font-mono-tech text-[11px] text-[var(--sig-danger)]"></div>
+        </div>
+
+        <!-- Interactive Table -->
+        <div class="overflow-x-auto max-h-[430px] overflow-y-auto">
+          <table class="w-full border-collapse font-mono-tech text-xs">
+            <thead class="sticky top-0 z-10 elevated-surface hairline-b text-[10px] text-[var(--ink-secondary)] uppercase">
+              <tr>
+                <th class="py-2 px-2.5 text-left hairline-r">JOB NAME</th>
+                <th class="py-2 px-2.5 text-left hairline-r">BASELINE CRON</th>
+                <th class="py-2 px-2.5 text-left hairline-r">UNHERD PHASE-SHIFTED</th>
+                <th class="py-2 px-2 text-right hairline-r">SHIFT</th>
+                <th class="py-2 px-2 text-right hairline-r">WEIGHT</th>
+                <th class="py-2 px-2 text-right hairline-r">RUNS/D</th>
+                <th class="py-2 px-2 text-center">SLA PIN</th>
+              </tr>
+            </thead>
+            <tbody id="fleetTableBody" class="divide-y divide-[var(--rule-hairline)]"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- RIGHT 5 COLS: TABBED RAW CRONTAB/YAML EDITOR vs UNIFIED GIT DIFF (`diff -u`) -->
+      <section class="lg:col-span-5 hairline-border panel-surface flex flex-col">
+        <div class="px-3.5 py-2.5 hairline-b elevated-surface flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5">
+            <span class="hw-tag bg-[var(--ink-primary)] text-[var(--bg-panel)]">SEC-04</span>
+            <button type="button" data-codetab="diff" class="codetab-btn hw-btn hw-btn-active">
+              UNIFIED DIFF (git apply)
+            </button>
+            <button type="button" data-codetab="editor" class="codetab-btn hw-btn">
+              RAW SCHEDULE INPUT
+            </button>
+            <button type="button" data-codetab="optimized" class="codetab-btn hw-btn">
+              OPTIMIZED OUTPUT
+            </button>
+          </div>
+
+          <div class="flex items-center gap-1.5">
+            <button id="btnCopyCode" type="button" class="hw-btn">
+              COPY BUFFER
+            </button>
+            <button id="btnDownloadPatch" type="button" class="hw-btn">
+              .PATCH
+            </button>
+          </div>
+        </div>
+
+        <!-- Tab 1: Unified Diff View -->
+        <div id="paneDiff" class="p-3 flex-1 flex flex-col">
+          <div class="flex items-center justify-between font-mono-tech text-[11px] text-[var(--ink-secondary)] mb-2">
+            <span>FORMAT: POSIX <code class="px-1 elevated-surface">diff -u a/schedule b/schedule</code></span>
+            <span id="diffMutationCounter" class="text-[var(--sig-ok)] font-semibold">13 SCHEDULES PHASE-SHIFTED</span>
+          </div>
+          <pre id="diffOutputPre" class="flex-1 bg-[var(--bg-code)] text-[#E6E1D3] p-3 font-mono-tech text-[11px] leading-relaxed overflow-auto max-h-[370px] hairline-border"></pre>
+        </div>
+
+        <!-- Tab 2: Raw Config Live Editor -->
+        <div id="paneEditor" class="hidden p-3 flex-1 flex flex-col">
+          <div class="flex items-center justify-between font-mono-tech text-[11px] text-[var(--ink-secondary)] mb-2">
+            <span>PASTE CRONTAB, K8S CRONJOB YAML, OR GITHUB ACTIONS YAML:</span>
+            <button id="btnParseRawConfig" type="button" class="hw-btn hw-btn-primary py-0.5 px-2 text-[10px]">
+              PARSE &amp; SOLVE
+            </button>
+          </div>
+          <textarea id="rawConfigTextarea" rows="15" spellcheck="false" class="flex-1 w-full bg-[var(--bg-code)] text-[#E6E1D3] p-3 font-mono-tech text-[11px] leading-relaxed hairline-border focus:outline-none"></textarea>
+        </div>
+
+        <!-- Tab 3: Clean Drop-in Optimized File -->
+        <div id="paneOptimized" class="hidden p-3 flex-1 flex flex-col">
+          <div class="flex items-center justify-between font-mono-tech text-[11px] text-[var(--ink-secondary)] mb-2">
+            <span>DROP-IN PRODUCTION CONFIG (ALL HERD SPIKES FLATTENED):</span>
+            <span class="text-[var(--sig-ok)] font-semibold">READY FOR DEPLOY</span>
+          </div>
+          <pre id="optimizedOutputPre" class="flex-1 bg-[var(--bg-code)] text-[#E6E1D3] p-3 font-mono-tech text-[11px] leading-relaxed overflow-auto max-h-[370px] hairline-border"></pre>
+        </div>
+      </section>
+    </div>
+
+    <!-- ROW 4: SYNCHRONIZED RETRY-STORM CASCADE SIMULATOR (SEC-05) -->
+    <section class="hairline-border panel-surface">
+      <div class="px-3.5 py-2.5 hairline-b elevated-surface flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="hw-tag bg-[var(--sig-danger)] text-white border-transparent">SEC-05</span>
+          <h2 class="font-display-tech font-bold text-sm uppercase tracking-tight">
+            DOWNSTREAM BROWNOUT &amp; SYNCHRONIZED RETRY-STORM CASCADE SIMULATOR
+          </h2>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3 font-mono-tech text-xs">
+          <label class="flex items-center gap-2">
+            <span class="text-[11px] text-[var(--ink-secondary)]">DB BROWNOUT DURATION:</span>
+            <input id="sliderOutageSec" type="range" min="6" max="36" step="2" value="16" class="accent-[var(--ink-primary)] cursor-pointer" />
+            <span id="labelOutageSec" class="font-bold min-w-[34px]">16s</span>
+          </label>
+          <button id="btnResimulateStorm" type="button" class="hw-btn">
+            &#8635; RE-TRIGGER OUTAGE AT PEAK SPIKE
+          </button>
+        </div>
+      </div>
+
+      <div class="p-3.5 grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+        <div class="lg:col-span-4 flex flex-col gap-2.5 font-mono-tech text-xs">
+          <div class="p-3 hairline-border bg-[var(--bg-chassis)]">
+            <div class="text-[10px] text-[var(--ink-muted)] uppercase">WORST SPIKE TARGET WINDOW</div>
+            <div id="stormSpikeHeader" class="text-base font-bold mt-0.5">
+              00:00 UTC // 14 CONCURRENT JOBS
+            </div>
+            <p class="text-[11px] text-[var(--ink-secondary)] mt-1 leading-relaxed font-sans">
+              When a cron herd hits a transient DB lock or HTTP 429 at <code class="font-mono-tech">:00</code>, standard <code class="font-mono-tech">2^attempt</code> exponential backoff aligns every worker's retry wave at <code class="font-mono-tech">t+2s, +6s, +14s, +30s</code>, preventing recovery.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div class="p-2.5 hairline-border bg-[var(--sig-danger-soft)]">
+              <div class="text-[10px] text-[var(--sig-danger)] font-bold">NAIVE EXP BACKOFF + HERD</div>
+              <div id="stormNaiveAmp" class="text-xl font-bold text-[var(--sig-danger)] mt-0.5">3.45x</div>
+              <div id="stormNaiveOverSec" class="text-[10px] text-[var(--ink-secondary)] mt-0.5">
+                9 SECONDS OVER CIRCUIT BREAKER
+              </div>
+            </div>
+            <div class="p-2.5 hairline-border bg-[var(--sig-ok-soft)]">
+              <div class="text-[10px] text-[var(--sig-ok)] font-bold">UNHERD + DECORRELATED JITTER</div>
+              <div id="stormDecorrAmp" class="text-xl font-bold text-[var(--sig-ok)] mt-0.5">0.52x</div>
+              <div id="stormDecorrOverSec" class="text-[10px] text-[var(--ink-secondary)] mt-0.5">
+                0 SECONDS OVER CIRCUIT BREAKER
+              </div>
+            </div>
+          </div>
+
+          <div class="p-2.5 hairline-border elevated-surface text-[11px] leading-relaxed">
+            <span class="font-bold">AWS Decorrelated Jitter Formula:</span><br />
+            <code class="text-[10px]">sleep = min(cap, random_between(base, prev_sleep * 3))</code>
+          </div>
+        </div>
+
+        <div class="lg:col-span-8">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-1.5 font-mono-tech text-[11px]">
+            <div class="flex flex-wrap items-center gap-4">
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-3 h-0.5 bg-[var(--sig-danger)] inline-block"></span>
+                <span class="text-[var(--ink-secondary)]">HERD + NAIVE 2^N BACKOFF (QPS)</span>
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-3 h-0.5 bg-[var(--sig-warn)] inline-block"></span>
+                <span class="text-[var(--ink-secondary)]">HERD + EQUAL JITTER</span>
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <span class="w-3 h-0.5 bg-[var(--sig-ok)] inline-block"></span>
+                <span class="text-[var(--ink-secondary)]">UNHERD PHASE-SHIFT + DECORRELATED JITTER</span>
+              </span>
+            </div>
+            <span class="text-[10px] text-[var(--sig-danger)] font-semibold">--- DB CIRCUIT BREAKER LIMIT</span>
+          </div>
+          <div class="relative w-full h-52 hairline-border bg-[var(--bg-chassis)]">
+            <canvas id="retryStormCanvas" class="w-full h-full block"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER: CLI REFERENCE & MATHEMATICAL SPECIFICATION -->
+  <footer class="hairline-t elevated-surface mt-6 py-3 px-3 sm:px-5 font-mono-tech text-[11px] text-[var(--ink-secondary)]">
+    <div class="max-w-[1560px] mx-auto flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <span>CLI EQUIVALENT: </span>
+        <code class="px-1.5 py-0.5 bg-[var(--bg-panel)] hairline-border text-[var(--ink-primary)]">
+          python3 -m unherd optimize production_fleet.crontab --allow-hour-shift --diff
+        </code>
+      </div>
+      <div>
+        <span>SOLVER OBJECTIVE: MINIMIZE L_&infin; PEAK CONCURRENCY + L_3 COLLISION ENERGY // MIT LICENSE</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- NON-MODAL HARDWARE TOAST NOTIFICATION -->
+  <div id="hwToast" class="fixed bottom-4 right-4 z-50 hidden px-3.5 py-2 bg-[var(--ink-primary)] text-[var(--bg-panel)] font-mono-tech text-xs border border-[var(--rule-hairline)] shadow-none">
+    <span id="hwToastText">BUFFER COPIED TO CLIPBOARD</span>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      // =========================================================================
+      // 1. REALISTIC FLEET FIXTURES (CRONTAB, K8S CRONJOB YAML, GITHUB ACTIONS)
+      // =========================================================================
+      const FLEET_PRESETS = {
+        saas: [
+          "# Production SaaS Fleet Crontab (16 scheduled workers)",
+          "# Classic engineering anti-pattern: human schedules cluster on :00 and */5",
+          "*/5 * * * *  /srv/bin/sync-stripe-webhooks --batch=500       # name=stripe-webhook-sync weight=2.5 duration=18s",
+          "*/5 * * * *  /srv/bin/flush-redis-clickstream --shards=8     # name=redis-clickstream-flush weight=2.0 duration=14s",
+          "*/5 * * * *  /srv/bin/poll-partner-inventory --timeout=10    # name=partner-inventory-poll weight=1.5 duration=12s",
+          "*/10 * * * * /srv/bin/recompute-leaderboard-ranks            # name=leaderboard-recompute weight=2.2 duration=22s",
+          "*/10 * * * * /srv/bin/outbox-relay-dispatcher                # name=outbox-relay weight=1.8 duration=10s",
+          "*/15 * * * * /srv/bin/refresh-materialized-views --concurrent # name=pg-matview-refresh weight=3.5 duration=35s",
+          "*/15 * * * * /srv/bin/sync-search-index --incremental        # name=meilisearch-delta-sync weight=2.4 duration=20s",
+          "*/30 * * * * /srv/bin/prune-expired-oauth-tokens             # name=oauth-token-prune weight=1.2 duration=15s",
+          "0 * * * *    /srv/bin/aggregate-tenant-usage-meters          # name=tenant-usage-rollup weight=3.2 duration=40s",
+          "0 * * * *    /srv/bin/generate-hourly-invoice-drafts         # name=invoice-draft-gen weight=2.8 duration=30s",
+          "0 * * * *    /srv/bin/export-snowflake-cdc-snapshot          # name=snowflake-cdc-export weight=3.0 duration=45s",
+          "0 * * * *    /srv/bin/evaluate-slo-burn-rate-alerts          # name=slo-burn-evaluator weight=1.5 duration=12s",
+          "0 */4 * * *  /srv/bin/compact-timeseries-partitions          # name=tsdb-partition-compact weight=3.8 duration=50s",
+          "0 0 * * *    /srv/bin/pg-vacuum-analyze-ledger               # name=pg-nightly-vacuum weight=4.5 duration=90s",
+          "0 0 * * *    /srv/bin/build-executive-arr-cohort-report      # name=arr-cohort-report weight=3.0 duration=45s",
+          "0 0 * * *    /srv/bin/regulatory-audit-log-seal              # name=audit-log-merkle-seal weight=2.0 duration=20s pinned"
+        ].join("\n"),
+
+        k8s: [
+          "apiVersion: batch/v1",
+          "kind: CronJob",
+          "metadata:",
+          "  name: k8s-billing-usage-aggregator",
+          "spec:",
+          '  schedule: "0 * * * *" # weight=3.2 duration=35s',
+          "---",
+          "apiVersion: batch/v1",
+          "kind: CronJob",
+          "metadata:",
+          "  name: k8s-clickhouse-etl-sync",
+          "spec:",
+          '  schedule: "*/5 * * * *" # weight=2.6 duration=20s',
+          "---",
+          "apiVersion: batch/v1",
+          "kind: CronJob",
+          "metadata:",
+          "  name: k8s-redis-session-gc",
+          "spec:",
+          '  schedule: "*/5 * * * *" # weight=1.8 duration=15s',
+          "---",
+          "apiVersion: batch/v1",
+          "kind: CronJob",
+          "metadata:",
+          "  name: k8s-kafka-lag-compactor",
+          "spec:",
+          '  schedule: "*/10 * * * *" # weight=2.4 duration=25s',
+          "---",
+          "apiVersion: batch/v1",
+          "kind: CronJob",
+          "metadata:",
+          "  name: k8s-vector-embeddings-indexer",
+          "spec:",
+          '  schedule: "*/15 * * * *" # weight=3.5 duration=40s',
+          "---",
+          "apiVersion: batch/v1",
+          "kind: CronJob",
+          "metadata:",
+          "  name: k8s-feature-store-materialize",
+          "spec:",
+          '  schedule: "*/15 * * * *" # weight=2.8 duration=30s',
+          "---",
+          "apiVersion: batch/v1",
+          "kind: CronJob",
+          "metadata:",
+          "  name: k8s-stripe-reconciliation",
+          "spec:",
+          '  schedule: "0 * * * *" # weight=2.9 duration=25s',
+          "---",
+          "apiVersion: batch/v1",
+          "kind: CronJob",
+          "metadata:",
+          "  name: k8s-s3-parquet-compaction",
+          "spec:",
+          '  schedule: "0 */2 * * *" # weight=3.6 duration=50s',
+          "---",
+          "apiVersion: batch/v1",
+          "kind: CronJob",
+          "metadata:",
+          "  name: k8s-rds-snapshot-verifier",
+          "spec:",
+          '  schedule: "0 0 * * *" # weight=4.0 duration=60s pinned'
+        ].join("\n"),
+
+        gha: [
+          "# GitHub Actions Monorepo Scheduled Workflows (.github/workflows/)",
+          "name: e2e-playwright-synthetic-canary",
+          '  - cron: "*/10 * * * *" # weight=2.8 duration=45s',
+          "name: dependency-cve-trivy-scan",
+          '  - cron: "0 * * * *" # weight=2.2 duration=35s',
+          "name: stale-pr-branch-sweeper",
+          '  - cron: "0 * * * *" # weight=1.4 duration=15s',
+          "name: docker-base-image-rebuild",
+          '  - cron: "0 */6 * * *" # weight=3.8 duration=90s',
+          "name: npm-workspace-cache-warm",
+          '  - cron: "*/15 * * * *" # weight=2.5 duration=30s',
+          "name: rust-cargo-miri-sanitizer",
+          '  - cron: "0 0 * * *" # weight=4.2 duration=110s',
+          "name: openapi-sdk-codegen-sync",
+          '  - cron: "*/30 * * * *" # weight=2.0 duration=25s',
+          "name: terraform-drift-detection",
+          '  - cron: "0 * * * *" # weight=3.0 duration=40s',
+          "name: license-compliance-sbom-export",
+          '  - cron: "0 0 * * *" # weight=2.6 duration=35s pinned'
+        ].join("\n"),
+
+        fintech: [
+          "# High-Frequency Fintech Ledger & Clearing Fleet",
+          "*/5 * * * *  /bin/ach-batch-ingest          # name=ach-ingest weight=3.2 duration=22s",
+          "*/5 * * * *  /bin/sepa-instant-reconcile    # name=sepa-reconcile weight=2.8 duration=18s",
+          "*/5 * * * *  /bin/fx-spot-rate-snapshot     # name=fx-rate-snap weight=1.6 duration=10s",
+          "*/5 * * * *  /bin/fraud-velocity-scorer     # name=fraud-velocity weight=3.5 duration=25s",
+          "*/15 * * * * /bin/ledger-double-entry-audit # name=double-entry-audit weight=4.0 duration=40s",
+          "*/15 * * * * /bin/treasury-sweep-check      # name=treasury-sweep weight=2.7 duration=20s",
+          "0 * * * *    /bin/nostro-vostro-balance     # name=nostro-balance weight=3.4 duration=35s",
+          "0 * * * *    /bin/card-network-clearing     # name=card-clearing weight=3.8 duration=45s",
+          "0 * * * *    /bin/aml-sanctions-delta-sync  # name=aml-sanctions-sync weight=2.9 duration=30s",
+          "0 0 * * *    /bin/fedwire-cutoff-settlement # name=fedwire-cutoff weight=4.8 duration=60s pinned"
+        ].join("\n")
+      };
+
+      // =========================================================================
+      // 2. POSIX CRON & MULTI-FORMAT PARSER ENGINE (BROWSER PORT OF unherd/parser.py)
+      // =========================================================================
+      const MACROS = {
+        "@yearly": "0 0 1 1 *",
+        "@annually": "0 0 1 1 *",
+        "@monthly": "0 0 1 * *",
+        "@weekly": "0 0 * * 0",
+        "@daily": "0 0 * * *",
+        "@midnight": "0 0 * * *",
+        "@hourly": "0 * * * *"
+      };
+
+      const MONTH_MAP = {
+        jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+        jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12
+      };
+
+      const DOW_MAP = {
+        sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6
+      };
+
+      function replaceNames(str, map) {
+        let out = str.toLowerCase();
+        for (const [k, v] of Object.entries(map)) {
+          out = out.replace(new RegExp("\\b" + k + "\\b", "g"), String(v));
+        }
+        return out;
+      }
+
+      function parseCronField(fieldStr, minVal, maxVal, namesMap, isDow) {
+        let cleaned = fieldStr.trim();
+        if (!cleaned) throw new Error("Empty cron field");
+        if (namesMap) cleaned = replaceNames(cleaned, namesMap);
+
+        const set = new Set();
+        const parts = cleaned.split(",");
+        for (let rawPart of parts) {
+          const part = rawPart.trim();
+          if (!part) continue;
+          let step = 1;
+          let rangePart = part;
+          if (part.includes("/")) {
+            const splitStep = part.split("/");
+            rangePart = splitStep[0];
+            step = parseInt(splitStep[1], 10);
+            if (isNaN(step) || step <= 0) {
+              throw new Error("Invalid step in '" + fieldStr + "'");
+            }
+          }
+
+          let start, end;
+          if (rangePart === "*" || rangePart === "?") {
+            start = minVal;
+            end = maxVal;
+          } else if (rangePart.includes("-")) {
+            const [loStr, hiStr] = rangePart.split("-");
+            start = parseInt(loStr, 10);
+            end = parseInt(hiStr, 10);
+            if (isNaN(start) || isNaN(end)) {
+              throw new Error("Invalid range in '" + fieldStr + "'");
+            }
+          } else {
+            let val = parseInt(rangePart, 10);
+            if (isNaN(val)) throw new Error("Invalid number in '" + fieldStr + "'");
+            if (isDow && val === 7) val = 0;
+            if (part.includes("/")) {
+              start = val;
+              end = maxVal;
+            } else {
+              if (val < minVal || val > maxVal) {
+                throw new Error("Value " + val + " outside [" + minVal + "," + maxVal + "]");
+              }
+              set.add(val);
+              continue;
+            }
+          }
+
+          const upperCheck = isDow ? 7 : maxVal;
+          if (start < minVal || end > upperCheck || start > end) {
+            throw new Error("Range " + start + "-" + end + " out of bounds");
+          }
+          for (let v = start; v <= end; v += step) {
+            set.add(isDow && v === 7 ? 0 : v);
+          }
+        }
+
+        const sorted = Array.from(set).sort((a, b) => a - b);
+        if (sorted.length === 0) throw new Error("No valid ticks in '" + fieldStr + "'");
+        return sorted;
+      }
+
+      function parseCronExpression(expr) {
+        const raw = expr.trim();
+        const expanded = MACROS[raw.toLowerCase()] || raw;
+        const fields = expanded.split(/\s+/);
+        if (fields.length !== 5) {
+          throw new Error("Expected 5 cron fields (min hour dom mon dow), got " + fields.length);
+        }
+        const [mRaw, hRaw, domRaw, monRaw, dowRaw] = fields;
+        const minutes = parseCronField(mRaw, 0, 59, null, false);
+        const hours = parseCronField(hRaw, 0, 23, null, false);
+        const doms = parseCronField(domRaw, 1, 31, null, false);
+        const months = parseCronField(monRaw, 1, 12, MONTH_MAP, false);
+        const dows = parseCronField(dowRaw, 0, 6, DOW_MAP, true);
+
+        const dailyFireMinutes = [];
+        for (let i = 0; i < hours.length; i++) {
+          const base = hours[i] * 60;
+          for (let j = 0; j < minutes.length; j++) {
+            dailyFireMinutes.push(base + minutes[j]);
+          }
+        }
+
+        return {
+          expression: expanded,
+          minutes,
+          hours,
+          doms,
+          months,
+          dows,
+          mRaw,
+          hRaw,
+          domRaw,
+          monRaw,
+          dowRaw,
+          dailyFireMinutes
+        };
+      }
+
+      function extractInlineTags(text) {
+        let durationSec = 15;
+        let weight = 1.0;
+        let pinned = false;
+
+        const durMatch = text.match(/(?:duration|dur)\s*=\s*(\d+)\s*s?/i);
+        if (durMatch) durationSec = Math.max(1, Math.min(3600, parseInt(durMatch[1], 10)));
+
+        const wMatch = text.match(/(?:weight|load|cost)\s*=\s*([0-9.]+)/i);
+        if (wMatch) weight = Math.max(0.1, Math.min(100, parseFloat(wMatch[1])));
+
+        if (/\b(?:pinned|strict|fixed)\b/i.test(text)) pinned = true;
+
+        return { durationSec, weight, pinned };
+      }
+
+      function parseFleetConfig(content) {
+        const lines = content.split(/\r?\n/);
+        const jobs = [];
+
+        const isYaml = lines.some((ln) =>
+          /^\s*(?:apiVersion|kind:\s*CronJob|schedule:\s*['"]|-?\s*cron:\s*['"])/.test(ln)
+        );
+
+        if (isYaml) {
+          let currentName = null;
+          let pendingComment = "";
+          lines.forEach((line, idx) => {
+            const stripped = line.trim();
+            if (stripped.startsWith("#")) {
+              pendingComment = stripped;
+              return;
+            }
+            const nameMatch = line.match(/^\s*name:\s*['"]?([a-zA-Z0-9_.-]+)['"]?/);
+            if (nameMatch) {
+              currentName = nameMatch[1];
+              return;
+            }
+            const schedMatch = line.match(/^\s*(?:-\s*)?(?:schedule|cron):\s*['"]([^'"]+)['"](.*)$/);
+            if (schedMatch) {
+              const expr = schedMatch[1].trim();
+              const trailing = schedMatch[2] + " " + pendingComment;
+              try {
+                const schedule = parseCronExpression(expr);
+                const tags = extractInlineTags(trailing);
+                const jobIdx = jobs.length + 1;
+                jobs.push({
+                  id: "job-" + String(jobIdx).padStart(2, "0"),
+                  name: currentName || "yaml-job-" + String(jobIdx).padStart(2, "0"),
+                  expression: schedule.expression,
+                  schedule,
+                  durationSec: tags.durationSec,
+                  weight: tags.weight,
+                  pinned: tags.pinned,
+                  sourceFormat: "yaml",
+                  lineNumber: idx + 1,
+                  rawLine: line
+                });
+                currentName = null;
+                pendingComment = "";
+              } catch (_e) {
+                // Skip invalid line
+              }
+            }
+          });
+          if (jobs.length > 0) return jobs;
+        }
+
+        // Standard Crontab parser
+        let pendingComment = "";
+        lines.forEach((line, idx) => {
+          const stripped = line.trim();
+          if (!stripped) {
+            pendingComment = "";
+            return;
+          }
+          if (stripped.startsWith("#")) {
+            pendingComment = stripped;
+            return;
+          }
+          if (/^[A-Za-z_][A-Za-z0-9_]*\s*=/.test(stripped)) return;
+
+          let expr = "";
+          let cmdPart = "";
+          if (stripped.startsWith("@")) {
+            const firstSpace = stripped.search(/\s/);
+            if (firstSpace === -1) return;
+            expr = stripped.slice(0, firstSpace);
+            cmdPart = stripped.slice(firstSpace).trim();
+          } else {
+            const tokens = stripped.split(/\s+/);
+            if (tokens.length < 6) return;
+            expr = tokens.slice(0, 5).join(" ");
+            cmdPart = tokens.slice(5).join(" ");
+          }
+
+          let schedule;
+          try {
+            schedule = parseCronExpression(expr);
+          } catch (_e) {
+            return;
+          }
+
+          let cmdClean = cmdPart;
+          let metaSource = pendingComment;
+          const hashIdx = cmdPart.indexOf("#");
+          if (hashIdx !== -1) {
+            cmdClean = cmdPart.slice(0, hashIdx).trim();
+            metaSource = cmdPart.slice(hashIdx + 1) + " " + pendingComment;
+          }
+
+          const tags = extractInlineTags(metaSource);
+          const nameMatch = metaSource.match(/name\s*=\s*([a-zA-Z0-9_.:-]+)/);
+          let jobName = "";
+          if (nameMatch) {
+            jobName = nameMatch[1];
+          } else {
+            const cmdTokens = cmdClean
+              .split(/\s+/)
+              .filter((t) => !t.startsWith("-") && !["/bin/sh", "/bin/bash", "python", "python3", "node"].includes(t));
+            const rawLabel = cmdTokens.length ? cmdTokens[cmdTokens.length - 1] : cmdClean;
+            const segments = rawLabel.split("/");
+            jobName = (segments[segments.length - 1] || "cron-job").slice(0, 28);
+          }
+
+          const jobIdx = jobs.length + 1;
+          jobs.push({
+            id: "job-" + String(jobIdx).padStart(2, "0"),
+            name: jobName,
+            expression: schedule.expression,
+            schedule,
+            durationSec: tags.durationSec,
+            weight: tags.weight,
+            pinned: tags.pinned,
+            sourceFormat: "crontab",
+            lineNumber: idx + 1,
+            rawLine: line
+          });
+          pendingComment = "";
+        });
+
+        return jobs;
+      }
+
+      // =========================================================================
+      // 3. TEMPORAL DENSITY ANALYZER & PHASE-SHIFT SOLVER (PORT OF unherd/engine.py)
+      // =========================================================================
+      function formatMinuteOfDay(mod) {
+        const h = Math.floor(mod / 60) % 24;
+        const m = mod % 60;
+        return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+      }
+
+      function analyzeFleet(jobs) {
+        const minuteConcurrency = new Array(1440).fill(0);
+        const minuteWeightedLoad = new Array(1440).fill(0);
+        const minuteJobs = Array.from({ length: 1440 }, () => []);
+        const moduloCounts = new Array(60).fill(0);
+        const moduloJobs = Array.from({ length: 60 }, () => new Set());
+
+        let totalRuns = 0;
+        let minuteZeroRuns = 0;
+
+        for (const job of jobs) {
+          const fires = job.schedule.dailyFireMinutes;
+          totalRuns += fires.length;
+          const spanMins = Math.max(1, Math.ceil(job.durationSec / 60));
+
+          for (let i = 0; i < fires.length; i++) {
+            const fm = fires[i];
+            const mod60 = fm % 60;
+            moduloCounts[mod60] += 1;
+            moduloJobs[mod60].add(job.name);
+            if (mod60 === 0) minuteZeroRuns += 1;
+
+            for (let off = 0; off < spanMins; off++) {
+              const slot = (fm + off) % 1440;
+              minuteConcurrency[slot] += 1;
+              const decay = off === 0 ? 1.0 : 0.75;
+              minuteWeightedLoad[slot] = +(minuteWeightedLoad[slot] + job.weight * decay).toFixed(4);
+              minuteJobs[slot].push(
+                off === 0 ? job : { ...job, name: job.name + " (spillover)" }
+              );
+            }
+          }
+        }
+
+        let peakConcurrency = 0;
+        let peakWeightedLoad = 0;
+        let peakSlot = 0;
+        let sumLoad = 0;
+        let collisionMins = 0;
+        let severeMins = 0;
+
+        for (let m = 0; m < 1440; m++) {
+          const c = minuteConcurrency[m];
+          const w = minuteWeightedLoad[m];
+          sumLoad += w;
+          if (c > peakConcurrency) peakConcurrency = c;
+          if (w > peakWeightedLoad) {
+            peakWeightedLoad = w;
+            peakSlot = m;
+          }
+          if (c >= 2) collisionMins += 1;
+          if (c >= 4) severeMins += 1;
+        }
+
+        const meanLoad = sumLoad / 1440;
+        const par = meanLoad > 0 ? peakWeightedLoad / meanLoad : 1.0;
+        const minZeroPct = totalRuns > 0 ? (minuteZeroRuns / totalRuns) * 100 : 0;
+
+        return {
+          totalJobs: jobs.length,
+          totalDailyRuns: totalRuns,
+          minuteConcurrency,
+          minuteWeightedLoad,
+          minuteJobs,
+          moduloCounts,
+          moduloJobs,
+          peakConcurrency,
+          peakWeightedLoad: +peakWeightedLoad.toFixed(2),
+          peakSlot,
+          peakToAverageRatio: +par.toFixed(1),
+          collisionMinutesCount: collisionMins,
+          severeMinutesCount: severeMins,
+          minuteZeroSharePct: +minZeroPct.toFixed(1)
+        };
+      }
+
+      function detectMinutePeriod(minutes) {
+        const n = minutes.length;
+        if (n === 60) return 1;
+        if (n === 1) return 60;
+        if (n > 1 && 60 % n === 0) {
+          const period = 60 / n;
+          const base = minutes[0];
+          const expected = [];
+          for (let i = 0; i < n; i++) expected.push((base + i * period) % 60);
+          expected.sort((a, b) => a - b);
+          for (let i = 0; i < n; i++) {
+            if (expected[i] !== minutes[i]) return null;
+          }
+          return period;
+        }
+        return null;
+      }
+
+      function detectHourPeriod(hours) {
+        const n = hours.length;
+        if (n === 24) return 1;
+        if (n === 1) return 24;
+        if (n > 1 && 24 % n === 0) {
+          const period = 24 / n;
+          const base = hours[0];
+          const expected = [];
+          for (let i = 0; i < n; i++) expected.push((base + i * period) % 24);
+          expected.sort((a, b) => a - b);
+          for (let i = 0; i < n; i++) {
+            if (expected[i] !== hours[i]) return null;
+          }
+          return period;
+        }
+        return null;
+      }
+
+      function formatShiftedMinuteField(period, phase) {
+        const p = ((phase % period) + period) % period;
+        if (period === 60) return { str: String(p), ticks: [p] };
+        if (period === 1) {
+          return { str: "*", ticks: Array.from({ length: 60 }, (_, i) => i) };
+        }
+        const ticks = [];
+        for (let i = 0; i < 60 / period; i++) {
+          ticks.push((p + i * period) % 60);
+        }
+        ticks.sort((a, b) => a - b);
+        const str = p === 0 ? "*/" + period : p + "-59/" + period;
+        return { str, ticks };
+      }
+
+      function formatShiftedHourField(origHours, origRaw, hourShift, allowHourShift) {
+        if (!allowHourShift || hourShift === 0) {
+          return { str: origRaw, ticks: origHours };
+        }
+        const period = detectHourPeriod(origHours);
+        if (!period || period === 1) {
+          return { str: origRaw, ticks: origHours };
+        }
+        if (period === 24) {
+          const nh = (origHours[0] + hourShift) % 24;
+          return { str: String(nh), ticks: [nh] };
+        }
+        const newPhase = (origHours[0] + hourShift) % period;
+        const ticks = [];
+        for (let i = 0; i < 24 / period; i++) {
+          ticks.push((newPhase + i * period) % 24);
+        }
+        ticks.sort((a, b) => a - b);
+        const str = newPhase === 0 ? "*/" + period : newPhase + "-23/" + period;
+        return { str, ticks };
+      }
+
+      function simpleHash(str) {
+        let h = 2166136261;
+        for (let i = 0; i < str.length; i++) {
+          h ^= str.charCodeAt(i);
+          h = Math.imul(h, 16777619);
+        }
+        return Math.abs(h);
+      }
+
+      function optimizeFleet(jobs, allowHourShift) {
+        const beforeAnalysis = analyzeFleet(jobs);
+
+        const indexed = jobs.map((job, idx) => ({ idx, job }));
+        indexed.sort((a, b) => {
+          const mpA = detectMinutePeriod(a.job.schedule.minutes);
+          const mpB = detectMinutePeriod(b.job.schedule.minutes);
+          const fixA = a.job.pinned || mpA === 1 ? 0 : 1;
+          const fixB = b.job.pinned || mpB === 1 ? 0 : 1;
+          if (fixA !== fixB) return fixA - fixB;
+          const prA = mpA !== null ? mpA : 999;
+          const prB = mpB !== null ? mpB : 999;
+          if (prA !== prB) return prA - prB;
+          const freqA = a.job.schedule.dailyFireMinutes.length;
+          const freqB = b.job.schedule.dailyFireMinutes.length;
+          if (freqA !== freqB) return freqB - freqA;
+          return b.job.weight - a.job.weight;
+        });
+
+        const loadGrid = new Array(1440).fill(0);
+        const concGrid = new Array(1440).fill(0);
+        const optimizedByIdx = new Array(jobs.length);
+        const mutationsByIdx = new Array(jobs.length).fill(null);
+
+        for (const { idx, job } of indexed) {
+          const sched = job.schedule;
+          const mPeriod = detectMinutePeriod(sched.minutes);
+          const hPeriod = detectHourPeriod(sched.hours);
+          const spanMins = Math.max(1, Math.ceil(job.durationSec / 60));
+
+          if (job.pinned || mPeriod === 1) {
+            for (const fm of sched.dailyFireMinutes) {
+              for (let off = 0; off < spanMins; off++) {
+                const slot = (fm + off) % 1440;
+                concGrid[slot] += 1;
+                loadGrid[slot] += job.weight * (off === 0 ? 1.0 : 0.75);
+              }
+            }
+            optimizedByIdx[idx] = { ...job, shiftMinutes: 0, hourShift: 0 };
+            continue;
+          }
+
+          const digest = simpleHash(job.id + ":" + job.name);
+          const candMPhases = [];
+          const maxM = mPeriod !== null ? mPeriod : 60;
+          for (let m = 0; m < maxM; m++) candMPhases.push(m);
+
+          const candHShifts = [0];
+          if (allowHourShift && hPeriod !== null && hPeriod > 1) {
+            const maxH = hPeriod === 24 ? 4 : hPeriod;
+            for (let h = 1; h < maxH; h++) candHShifts.push(h);
+          }
+
+          let bestTuple = null;
+          let bestCandidate = null;
+          const origBaseM = sched.minutes[0];
+
+          for (const hShift of candHShifts) {
+            const hFormatted = formatShiftedHourField(sched.hours, sched.hRaw, hShift, allowHourShift);
+            for (const mPhase of candMPhases) {
+              let mStr, candMins, shiftDelta;
+              if (mPeriod !== null) {
+                const mf = formatShiftedMinuteField(mPeriod, mPhase);
+                mStr = mf.str;
+                candMins = mf.ticks;
+                shiftDelta = ((mPhase - (origBaseM % mPeriod)) + mPeriod) % mPeriod;
+              } else {
+                candMins = sched.minutes.map((m) => (m + mPhase) % 60).sort((a, b) => a - b);
+                mStr = candMins.join(",");
+                shiftDelta = mPhase;
+              }
+
+              let peakAfter = 0;
+              let cubicEnergy = 0;
+              let collisionsAdded = 0;
+
+              for (let i = 0; i < hFormatted.ticks.length; i++) {
+                const base = hFormatted.ticks[i] * 60;
+                for (let j = 0; j < candMins.length; j++) {
+                  const fm = base + candMins[j];
+                  for (let off = 0; off < spanMins; off++) {
+                    const slot = (fm + off) % 1440;
+                    const newW = loadGrid[slot] + job.weight * (off === 0 ? 1.0 : 0.75);
+                    const newC = concGrid[slot] + 1;
+                    if (newW > peakAfter) peakAfter = newW;
+                    cubicEnergy += newW * newW * newW + newC * newC * 0.5;
+                    if (newC >= 2) collisionsAdded += newC - 1;
+                  }
+                }
+              }
+
+              let roundPenalty = 0;
+              for (const m of candMins) {
+                if (m === 0) roundPenalty += 0.25;
+                else if (m % 5 === 0) roundPenalty += 0.08;
+              }
+              const tieBreaker = ((mPhase * 37 + hShift * 13 + digest) % 59) * 1e-4;
+
+              const score = [
+                +peakAfter.toFixed(4),
+                +cubicEnergy.toFixed(4),
+                collisionsAdded,
+                +(roundPenalty + tieBreaker).toFixed(6),
+                Math.abs(hShift) * 60 + shiftDelta
+              ];
+
+              if (bestTuple === null || compareTuples(score, bestTuple) < 0) {
+                bestTuple = score;
+                bestCandidate = {
+                  mStr,
+                  candMins,
+                  hStr: hFormatted.str,
+                  candHours: hFormatted.ticks,
+                  shiftDelta,
+                  hShift
+                };
+              }
+            }
+          }
+
+          const newExpr = [
+            bestCandidate.mStr,
+            bestCandidate.hStr,
+            sched.domRaw,
+            sched.monRaw,
+            sched.dowRaw
+          ].join(" ");
+
+          const newSchedule = parseCronExpression(newExpr);
+          for (const fm of newSchedule.dailyFireMinutes) {
+            for (let off = 0; off < spanMins; off++) {
+              const slot = (fm + off) % 1440;
+              concGrid[slot] += 1;
+              loadGrid[slot] += job.weight * (off === 0 ? 1.0 : 0.75);
+            }
+          }
+
+          optimizedByIdx[idx] = {
+            ...job,
+            expression: newExpr,
+            schedule: newSchedule,
+            shiftMinutes: bestCandidate.shiftDelta,
+            hourShift: bestCandidate.hShift
+          };
+
+          if (newExpr !== job.expression) {
+            mutationsByIdx[idx] = {
+              jobId: job.id,
+              jobName: job.name,
+              oldExpr: job.expression,
+              newExpr: newExpr,
+              shiftMinutes: bestCandidate.shiftDelta,
+              hourShift: bestCandidate.hShift
+            };
+          }
+        }
+
+        const afterAnalysis = analyzeFleet(optimizedByIdx);
+        return {
+          originalJobs: jobs,
+          optimizedJobs: optimizedByIdx,
+          mutations: mutationsByIdx.filter(Boolean),
+          beforeAnalysis,
+          afterAnalysis
+        };
+      }
+
+      function compareTuples(a, b) {
+        for (let i = 0; i < a.length; i++) {
+          if (a[i] < b[i]) return -1;
+          if (a[i] > b[i]) return 1;
+        }
+        return 0;
+      }
+
+      // =========================================================================
+      // 4. UNIFIED DIFF & OPTIMIZED CONFIG BUILDER
+      // =========================================================================
+      function buildDiffAndOptimizedText(rawText, optResult) {
+        const origLines = rawText.split(/\r?\n/);
+        const newLines = [...origLines];
+
+        const optByLine = new Map();
+        const origByLine = new Map();
+        optResult.optimizedJobs.forEach((j) => {
+          if (j.lineNumber > 0) optByLine.set(j.lineNumber, j);
+        });
+        optResult.originalJobs.forEach((j) => {
+          if (j.lineNumber > 0) origByLine.set(j.lineNumber, j);
+        });
+
+        const diffHunks = [
+          "--- a/fleet_schedule.conf",
+          "+++ b/fleet_schedule.conf"
+        ];
+
+        for (let i = 0; i < origLines.length; i++) {
+          const ln = i + 1;
+          const origJob = origByLine.get(ln);
+          const optJob = optByLine.get(ln);
+          if (origJob && optJob && origJob.expression !== optJob.expression) {
+            const oldLine = origLines[i];
+            let updatedLine = oldLine;
+            if (oldLine.trim().startsWith("@")) {
+              const macroToken = oldLine.trim().split(/\s+/)[0];
+              updatedLine = oldLine.replace(macroToken, optJob.expression);
+            } else {
+              const escapedMinHour =
+                escapeRegExp(origJob.schedule.mRaw) + "\\s+" + escapeRegExp(origJob.schedule.hRaw);
+              updatedLine = oldLine.replace(
+                new RegExp(escapedMinHour),
+                optJob.schedule.mRaw + " " + optJob.schedule.hRaw
+              );
+            }
+            newLines[i] = updatedLine;
+            diffHunks.push("@@ -" + ln + ",1 +" + ln + ",1 @@");
+            diffHunks.push("-" + oldLine);
+            diffHunks.push("+" + updatedLine);
+          }
+        }
+
+        // Also include any synthetic jobs added via UI that had lineNumber === 0
+        optResult.optimizedJobs.forEach((optJob, idx) => {
+          const origJob = optResult.originalJobs[idx];
+          if (optJob.lineNumber === 0) {
+            const origLine = origJob.expression + " /srv/bin/" + origJob.name + " # name=" + origJob.name + " weight=" + origJob.weight + (origJob.pinned ? " pinned" : "");
+            const optLine = optJob.expression + " /srv/bin/" + optJob.name + " # name=" + optJob.name + " weight=" + optJob.weight + (optJob.pinned ? " pinned" : "");
+            newLines.push(optLine);
+            diffHunks.push("@@ -new,1 +new,1 @@");
+            diffHunks.push("-" + origLine);
+            diffHunks.push("+" + optLine);
+          }
+        });
+
+        return {
+          diffText: diffHunks.length > 2 ? diffHunks.join("\n") : "# Zero mutations needed (schedule is already optimal)",
+          optimizedText: newLines.join("\n")
+        };
+      }
+
+      function escapeRegExp(s) {
+        return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      }
+
+      // =========================================================================
+      // 5. SYNCHRONIZED RETRY-STORM SIMULATOR
+      // =========================================================================
+      function simulateRetryStorm(optResult, outageDurationSec, seedOffset) {
+        const before = optResult.beforeAnalysis;
+        const after = optResult.afterAnalysis;
+        const horizon = 75;
+
+        const spikeWeightBefore = Math.max(2, before.peakWeightedLoad);
+        const spikeWeightAfter = Math.max(1, after.peakWeightedLoad);
+
+        const initialReqsBefore = Math.max(6, Math.round(spikeWeightBefore * 6));
+        const initialReqsAfter = Math.max(2, Math.round(spikeWeightAfter * 6));
+        const capacityQps = Math.max(6, +(initialReqsBefore * 0.34).toFixed(1));
+
+        const naiveSeries = new Array(horizon).fill(0);
+        const equalJitterSeries = new Array(horizon).fill(0);
+        const unherdDecorrSeries = new Array(horizon).fill(0);
+
+        let rngState = 1337 + (seedOffset || 0);
+        function nextRand() {
+          rngState = (rngState * 1664525 + 1013904223) % 4294967296;
+          return rngState / 4294967296;
+        }
+
+        // 1. Baseline Herd + Naive Exponential Backoff & Equal Jitter
+        for (let r = 0; r < initialReqsBefore; r++) {
+          const t0 = r % 4 === 0 ? 1 : 0;
+          naiveSeries[t0] += 1;
+          equalJitterSeries[t0] += 1;
+
+          let tNaive = t0;
+          let tEqual = t0;
+
+          for (let attempt = 1; attempt <= 4; attempt++) {
+            const expDelay = Math.pow(2, attempt); // 2, 4, 8, 16s
+            tNaive += expDelay + (nextRand() - 0.5) * 0.25;
+            const idxN = Math.round(tNaive);
+            if (idxN >= 0 && idxN < horizon) {
+              // If inside brownout window or congested wave, retry fires at full strength
+              const decayN = idxN <= outageDurationSec + 14 ? 1.0 : Math.pow(0.65, attempt);
+              naiveSeries[idxN] += decayN;
+            }
+
+            tEqual += expDelay * 0.5 + nextRand() * (expDelay * 0.65);
+            const idxE = Math.round(tEqual);
+            if (idxE >= 0 && idxE < horizon) {
+              const decayE = idxE <= outageDurationSec ? 0.95 : Math.pow(0.55, attempt);
+              equalJitterSeries[idxE] += decayE;
+            }
+          }
+        }
+
+        // 2. Unherd Phase-Shifted + AWS Decorrelated Jitter
+        for (let r = 0; r < initialReqsAfter; r++) {
+          const t0 = r % 3 === 0 ? 1 : 0;
+          unherdDecorrSeries[t0] += 1;
+          let tDec = t0;
+          let prevSleep = 2.0;
+          for (let attempt = 1; attempt <= 4; attempt++) {
+            const sleep = Math.min(28, 2.0 + nextRand() * (prevSleep * 3.0 - 2.0));
+            prevSleep = sleep;
+            tDec += sleep;
+            const idxD = Math.round(tDec);
+            if (idxD >= 0 && idxD < horizon) {
+              const survival = idxD <= outageDurationSec ? 0.85 : Math.pow(0.35, attempt);
+              unherdDecorrSeries[idxD] += survival;
+            }
+          }
+        }
+
+        const peakNaive = Math.max(...naiveSeries, 1);
+        const peakDecorr = Math.max(...unherdDecorrSeries, 1);
+        const overSecNaive = naiveSeries.filter((v) => v > capacityQps).length;
+        const overSecDecorr = unherdDecorrSeries.filter((v) => v > capacityQps).length;
+
+        return {
+          horizon,
+          outageDurationSec,
+          capacityQps,
+          naiveSeries,
+          equalJitterSeries,
+          unherdDecorrSeries,
+          spikeSlotLabel: formatMinuteOfDay(before.peakSlot),
+          concurrentAtSpike: before.peakConcurrency,
+          ampNaive: +(peakNaive / capacityQps).toFixed(2),
+          ampDecorr: +(peakDecorr / capacityQps).toFixed(2),
+          overSecNaive,
+          overSecDecorr
+        };
+      }
+
+      // =========================================================================
+      // 6. APPLICATION STATE & DOM CONTROLLER
+      // =========================================================================
+      const state = {
+        theme: "paper",
+        activePreset: "saas",
+        traceMode: "overlay",     // "overlay" | "before" | "after"
+        zoomRange: "24h",         // "24h" (1440m) | "6h" (360m) | "1h" (60m)
+        matrixViewAfter: true,
+        allowHourShift: false,
+        activeCodeTab: "diff",
+        selectedMinuteSlot: 0,
+        selectedModuloMinute: 0,
+        outageDurationSec: 16,
+        stormSeed: 0,
+        rawConfigText: FLEET_PRESETS.saas,
+        jobs: [],
+        optResult: null,
+        diffBundle: null,
+        stormReport: null
+      };
+
+      function showToast(msg) {
+        const toast = document.getElementById("hwToast");
+        const text = document.getElementById("hwToastText");
+        text.textContent = msg;
+        toast.classList.remove("hidden");
+        clearTimeout(showToast._timer);
+        showToast._timer = setTimeout(() => {
+          toast.classList.add("hidden");
+        }, 2400);
+      }
+
+      function recomputeAll() {
+        state.optResult = optimizeFleet(state.jobs, state.allowHourShift);
+        state.diffBundle = buildDiffAndOptimizedText(state.rawConfigText, state.optResult);
+        state.stormReport = simulateRetryStorm(
+          state.optResult,
+          state.outageDurationSec,
+          state.stormSeed
+        );
+
+        renderKPIStrip();
+        renderOscilloscope();
+        renderSlotInspector(state.selectedMinuteSlot);
+        renderModuloMatrix();
+        renderFleetTable();
+        renderCodePanes();
+        renderRetryStorm();
+      }
+
+      function loadPreset(presetKey) {
+        state.activePreset = presetKey;
+        state.rawConfigText = FLEET_PRESETS[presetKey] || FLEET_PRESETS.saas;
+        document.getElementById("rawConfigTextarea").value = state.rawConfigText;
+        state.jobs = parseFleetConfig(state.rawConfigText);
+        state.selectedMinuteSlot = 0;
+        state.selectedModuloMinute = 0;
+
+        document.querySelectorAll(".preset-btn").forEach((btn) => {
+          btn.classList.toggle("hw-btn-active", btn.dataset.preset === presetKey);
+        });
+
+        recomputeAll();
+      }
+
+      // =========================================================================
+      // 7. RENDER FUNCTIONS FOR EVERY PANEL
+      // =========================================================================
+      function renderKPIStrip() {
+        const b = state.optResult.beforeAnalysis;
+        const a = state.optResult.afterAnalysis;
+
+        document.getElementById("kpiPeakBefore").textContent = String(b.peakConcurrency);
+        document.getElementById("kpiPeakAfter").textContent = String(a.peakConcurrency);
+        const peakDropPct = b.peakConcurrency > 0
+          ? (((b.peakConcurrency - a.peakConcurrency) / b.peakConcurrency) * 100).toFixed(1)
+          : "0.0";
+        document.getElementById("kpiPeakDelta").textContent =
+          "-" + peakDropPct + "% PEAK COLLISION DROP";
+
+        document.getElementById("kpiLoadBefore").textContent = b.peakWeightedLoad.toFixed(1);
+        document.getElementById("kpiLoadAfter").textContent = a.peakWeightedLoad.toFixed(1);
+        const loadDropPct = b.peakWeightedLoad > 0
+          ? (((b.peakWeightedLoad - a.peakWeightedLoad) / b.peakWeightedLoad) * 100).toFixed(1)
+          : "0.0";
+        document.getElementById("kpiLoadDelta").textContent =
+          "-" + loadDropPct + "% DB IOPS SPIKE REDUCTION";
+
+        document.getElementById("kpiParBefore").textContent = b.peakToAverageRatio.toFixed(1) + "x";
+        document.getElementById("kpiParAfter").textContent = a.peakToAverageRatio.toFixed(1) + "x";
+
+        document.getElementById("kpiMinZeroBefore").textContent = b.minuteZeroSharePct.toFixed(1) + "%";
+        document.getElementById("kpiMinZeroAfter").textContent = a.minuteZeroSharePct.toFixed(1) + "%";
+
+        document.getElementById("kpiCollMinsBefore").textContent = String(b.collisionMinutesCount);
+        document.getElementById("kpiCollMinsAfter").textContent = String(a.collisionMinutesCount);
+        document.getElementById("kpiSevereSummary").textContent =
+          "SEVERE (\u22654 JOBS): " + b.severeMinutesCount + " \u2192 " + a.severeMinutesCount + " MINS";
+
+        document.getElementById("kpiTotalRunsBefore").textContent = b.totalDailyRuns.toLocaleString();
+        document.getElementById("kpiTotalRunsAfter").textContent = a.totalDailyRuns.toLocaleString();
+      }
+
+      function getVisibleMinuteCount() {
+        if (state.zoomRange === "1h") return 60;
+        if (state.zoomRange === "6h") return 360;
+        return 1440;
+      }
+
+      function renderOscilloscope() {
+        const canvas = document.getElementById("oscilloscopeCanvas");
+        if (!canvas) return;
+        const rect = canvas.parentElement.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(300, Math.floor(rect.width));
+        const height = Math.max(180, Math.floor(rect.height));
+
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        const ctx = canvas.getContext("2d");
+        ctx.scale(dpr, dpr);
+
+        const styles = getComputedStyle(document.documentElement);
+        const colGrid = styles.getPropertyValue("--canvas-grid").trim() || "rgba(20,20,19,0.08)";
+        const colInkMuted = styles.getPropertyValue("--ink-muted").trim() || "#858075";
+        const colDanger = styles.getPropertyValue("--sig-danger").trim() || "#D4381C";
+        const colOk = styles.getPropertyValue("--sig-ok").trim() || "#156840";
+        const colPrimary = styles.getPropertyValue("--ink-primary").trim() || "#141413";
+
+        ctx.clearRect(0, 0, width, height);
+
+        const padL = 42;
+        const padR = 14;
+        const padT = 16;
+        const padB = 26;
+        const plotW = width - padL - padR;
+        const plotH = height - padT - padB;
+
+        const b = state.optResult.beforeAnalysis;
+        const a = state.optResult.afterAnalysis;
+        const visibleMins = getVisibleMinuteCount();
+
+        const maxLoad = Math.max(10, b.peakWeightedLoad * 1.12, a.peakWeightedLoad * 1.12);
+
+        // Horizontal grid lines & Y axis labels
+        ctx.strokeStyle = colGrid;
+        ctx.lineWidth = 1;
+        ctx.font = "10px 'JetBrains Mono', monospace";
+        ctx.fillStyle = colInkMuted;
+        ctx.textAlign = "right";
+
+        const ySteps = 4;
+        for (let i = 0; i <= ySteps; i++) {
+          const val = (maxLoad / ySteps) * (ySteps - i);
+          const y = padT + (plotH / ySteps) * i;
+          ctx.beginPath();
+          ctx.moveTo(padL, y);
+          ctx.lineTo(padL + plotW, y);
+          ctx.stroke();
+          ctx.fillText(val.toFixed(0) + "w", padL - 6, y + 3);
+        }
+
+        // Vertical time markers
+        ctx.textAlign = "center";
+        const xTicks = visibleMins === 60 ? 12 : visibleMins === 360 ? 6 : 8;
+        for (let i = 0; i <= xTicks; i++) {
+          const m = Math.round((visibleMins / xTicks) * i);
+          const x = padL + (i / xTicks) * plotW;
+          ctx.beginPath();
+          ctx.moveTo(x, padT);
+          ctx.lineTo(x, padT + plotH);
+          ctx.stroke();
+          const label = m >= 1440 ? "24:00" : formatMinuteOfDay(m);
+          ctx.fillText(label, x, height - 8);
+        }
+
+        function xForMin(m) {
+          return padL + (m / (visibleMins - 1)) * plotW;
+        }
+        function yForVal(v) {
+          return padT + plotH - (Math.min(v, maxLoad) / maxLoad) * plotH;
+        }
+
+        // Draw Channel 1: Raw Baseline Herd
+        if (state.traceMode === "overlay" || state.traceMode === "before") {
+          ctx.save();
+          ctx.beginPath();
+          for (let m = 0; m < visibleMins; m++) {
+            const x = xForMin(m);
+            const y = yForVal(b.minuteWeightedLoad[m]);
+            if (m === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.strokeStyle = colDanger;
+          ctx.lineWidth = state.traceMode === "before" ? 1.75 : 1.35;
+          ctx.stroke();
+
+          ctx.lineTo(xForMin(visibleMins - 1), padT + plotH);
+          ctx.lineTo(xForMin(0), padT + plotH);
+          ctx.closePath();
+          ctx.fillStyle = state.theme === "crt" ? "rgba(255,82,38,0.14)" : "rgba(212,56,28,0.11)";
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Draw Channel 2: Unherd Phase-Shifted Wave
+        if (state.traceMode === "overlay" || state.traceMode === "after") {
+          ctx.save();
+          ctx.beginPath();
+          for (let m = 0; m < visibleMins; m++) {
+            const x = xForMin(m);
+            const y = yForVal(a.minuteWeightedLoad[m]);
+            if (m === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.strokeStyle = colOk;
+          ctx.lineWidth = 1.85;
+          ctx.stroke();
+
+          ctx.lineTo(xForMin(visibleMins - 1), padT + plotH);
+          ctx.lineTo(xForMin(0), padT + plotH);
+          ctx.closePath();
+          ctx.fillStyle = state.theme === "crt" ? "rgba(40,199,111,0.18)" : "rgba(21,104,64,0.16)";
+          ctx.fill();
+          ctx.restore();
+        }
+
+        // Draw Selected / Hovered Minute Cursor Hairline
+        const selM = Math.min(visibleMins - 1, Math.max(0, state.selectedMinuteSlot));
+        const cx = xForMin(selM);
+        ctx.save();
+        ctx.setLineDash([3, 3]);
+        ctx.strokeStyle = colPrimary;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx, padT);
+        ctx.lineTo(cx, padT + plotH);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function renderSlotInspector(slot) {
+        const b = state.optResult.beforeAnalysis;
+        const a = state.optResult.afterAnalysis;
+        const safeSlot = Math.max(0, Math.min(1439, slot));
+
+        const timeStr = formatMinuteOfDay(safeSlot);
+        const bConc = b.minuteConcurrency[safeSlot];
+        const aConc = a.minuteConcurrency[safeSlot];
+        const bLoad = b.minuteWeightedLoad[safeSlot].toFixed(1);
+        const aLoad = a.minuteWeightedLoad[safeSlot].toFixed(1);
+
+        document.getElementById("oscHoverReadout").textContent =
+          "CURSOR: " + timeStr + " UTC // BASELINE: " + bConc + " JOBS (" + bLoad + " WU) \u2192 UNHERD: " + aConc + " JOBS (" + aLoad + " WU)";
+
+        document.getElementById("inspectedTimeSlot").textContent =
+          timeStr + " UTC (MINUTE " + safeSlot + ")";
+        document.getElementById("inspectedSlotCounts").textContent =
+          "[BEFORE: " + bConc + " CONCURRENT | AFTER: " + aConc + " CONCURRENT]";
+
+        const container = document.getElementById("inspectedJobPills");
+        container.innerHTML = "";
+
+        const activeJobs = state.traceMode === "before"
+          ? b.minuteJobs[safeSlot]
+          : a.minuteJobs[safeSlot];
+        const beforeJobsAtSlot = b.minuteJobs[safeSlot];
+
+        if (beforeJobsAtSlot.length === 0 && activeJobs.length === 0) {
+          const span = document.createElement("span");
+          span.className = "text-[11px] text-[var(--ink-muted)]";
+          span.textContent = "QUIET MINUTE SLOT (0 SCHEDULED TRIGGERS)";
+          container.appendChild(span);
+          return;
+        }
+
+        const listToShow = state.traceMode === "after" ? a.minuteJobs[safeSlot] : beforeJobsAtSlot;
+        listToShow.slice(0, 8).forEach((j) => {
+          const pill = document.createElement("span");
+          pill.className = "hw-tag bg-[var(--bg-panel)] text-[var(--ink-primary)]";
+          pill.textContent = j.name + " (" + j.weight + "w)";
+          container.appendChild(pill);
+        });
+        if (listToShow.length > 8) {
+          const more = document.createElement("span");
+          more.className = "hw-tag";
+          more.textContent = "+" + (listToShow.length - 8) + " MORE";
+          container.appendChild(more);
+        }
+      }
+
+      function renderModuloMatrix() {
+        const grid = document.getElementById("moduloGrid");
+        grid.innerHTML = "";
+
+        const report = state.matrixViewAfter
+          ? state.optResult.afterAnalysis
+          : state.optResult.beforeAnalysis;
+
+        document.getElementById("matrixModeLabel").textContent =
+          state.matrixViewAfter ? "VIEW: AFTER UNHERD" : "VIEW: RAW BASELINE";
+
+        for (let m = 0; m < 60; m++) {
+          const count = report.moduloCounts[m];
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className =
+            "p-1.5 hairline-border flex flex-col items-center justify-center transition-colors cursor-pointer";
+
+          if (m === state.selectedModuloMinute) {
+            btn.style.outline = "2px solid var(--ink-primary)";
+            btn.style.outlineOffset = "-2px";
+          }
+
+          if (count === 0) {
+            btn.style.backgroundColor = "var(--bg-chassis)";
+            btn.style.color = "var(--ink-muted)";
+          } else if (count <= 24) {
+            btn.style.backgroundColor = "var(--sig-ok-soft)";
+            btn.style.color = "var(--sig-ok)";
+          } else if (count <= 72) {
+            btn.style.backgroundColor = "var(--sig-warn-soft)";
+            btn.style.color = "var(--sig-warn)";
+          } else {
+            btn.style.backgroundColor = "var(--sig-danger)";
+            btn.style.color = "#FFFFFF";
+          }
+
+          const minLabel = document.createElement("span");
+          minLabel.className = "text-[9px] opacity-80 leading-none";
+          minLabel.textContent = ":" + String(m).padStart(2, "0");
+
+          const valLabel = document.createElement("span");
+          valLabel.className = "text-[11px] font-bold leading-tight mt-0.5";
+          valLabel.textContent = String(count);
+
+          btn.appendChild(minLabel);
+          btn.appendChild(valLabel);
+
+          btn.addEventListener("click", () => {
+            state.selectedModuloMinute = m;
+            state.selectedMinuteSlot = m;
+            renderModuloMatrix();
+            renderOscilloscope();
+            renderSlotInspector(m);
+          });
+
+          grid.appendChild(btn);
+        }
+
+        const selMin = state.selectedModuloMinute;
+        const jobsAtMod = Array.from(report.moduloJobs[selMin] || []);
+        const countAtMod = report.moduloCounts[selMin];
+        const detailEl = document.getElementById("moduloMinuteDetail");
+        detailEl.textContent =
+          "MINUTE :" +
+          String(selMin).padStart(2, "0") +
+          " // " +
+          countAtMod +
+          " DAILY TRIGGERS" +
+          (jobsAtMod.length ? " \u2192 " + jobsAtMod.join(", ") : " (ZERO COLLISIONS)");
+      }
+
+      function renderFleetTable() {
+        const tbody = document.getElementById("fleetTableBody");
+        tbody.innerHTML = "";
+        document.getElementById("jobCountBadge").textContent = String(state.jobs.length);
+
+        state.optResult.optimizedJobs.forEach((optJob, idx) => {
+          const origJob = state.optResult.originalJobs[idx];
+          const tr = document.createElement("tr");
+          tr.className = "hover:bg-[var(--bg-elevated)] transition-colors";
+
+          const changed = origJob.expression !== optJob.expression;
+          const shiftBadge = origJob.pinned
+            ? "PINNED"
+            : changed
+            ? "+" + optJob.shiftMinutes + "m" + (optJob.hourShift ? " +" + optJob.hourShift + "h" : "")
+            : "0m";
+
+          // Col 1: Job Name
+          const tdName = document.createElement("td");
+          tdName.className = "py-2 px-2.5 hairline-r font-semibold";
+          tdName.textContent = origJob.name;
+
+          // Col 2: Baseline Cron (editable inline!)
+          const tdOrig = document.createElement("td");
+          tdOrig.className = "py-1.5 px-2 hairline-r";
+          const cronInput = document.createElement("input");
+          cronInput.type = "text";
+          cronInput.value = origJob.expression;
+          cronInput.setAttribute("aria-label", "Cron expression for " + origJob.name);
+          cronInput.className = "tech-input w-full py-0.5 px-1.5 text-[11px]";
+          cronInput.addEventListener("change", () => {
+            try {
+              const newSched = parseCronExpression(cronInput.value);
+              state.jobs[idx].expression = newSched.expression;
+              state.jobs[idx].schedule = newSched;
+              recomputeAll();
+              showToast("UPDATED CRON FOR " + origJob.name.toUpperCase());
+            } catch (err) {
+              cronInput.style.borderColor = "var(--sig-danger)";
+              showToast("INVALID CRON: " + err.message);
+            }
+          });
+          tdOrig.appendChild(cronInput);
+
+          // Col 3: Unherd Phase-Shifted Expression
+          const tdOpt = document.createElement("td");
+          tdOpt.className =
+            "py-2 px-2.5 hairline-r font-semibold " +
+            (changed ? "text-[var(--sig-ok)] bg-[var(--sig-ok-soft)]" : "text-[var(--ink-secondary)]");
+          tdOpt.textContent = optJob.expression;
+
+          // Col 4: Phase Shift Delta
+          const tdShift = document.createElement("td");
+          tdShift.className = "py-2 px-2 text-right hairline-r text-[11px]";
+          tdShift.textContent = shiftBadge;
+
+          // Col 5: Weight
+          const tdWeight = document.createElement("td");
+          tdWeight.className = "py-2 px-2 text-right hairline-r";
+          tdWeight.textContent = origJob.weight.toFixed(1) + "w";
+
+          // Col 6: Daily Runs Invariant
+          const tdRuns = document.createElement("td");
+          tdRuns.className = "py-2 px-2 text-right hairline-r text-[var(--ink-secondary)]";
+          tdRuns.textContent = String(optJob.schedule.dailyFireMinutes.length);
+
+          // Col 7: SLA Pin Toggle
+          const tdPin = document.createElement("td");
+          tdPin.className = "py-1.5 px-2 text-center";
+          const pinBtn = document.createElement("button");
+          pinBtn.type = "button";
+          pinBtn.className = "hw-btn py-0.5 px-2 text-[10px] " + (origJob.pinned ? "hw-btn-active" : "");
+          pinBtn.textContent = origJob.pinned ? "LOCKED" : "FREE";
+          pinBtn.addEventListener("click", () => {
+            state.jobs[idx].pinned = !state.jobs[idx].pinned;
+            recomputeAll();
+          });
+          tdPin.appendChild(pinBtn);
+
+          tr.appendChild(tdName);
+          tr.appendChild(tdOrig);
+          tr.appendChild(tdOpt);
+          tr.appendChild(tdShift);
+          tr.appendChild(tdWeight);
+          tr.appendChild(tdRuns);
+          tr.appendChild(tdPin);
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderCodePanes() {
+        const diffPre = document.getElementById("diffOutputPre");
+        const optPre = document.getElementById("optimizedOutputPre");
+        const mutCount = state.optResult.mutations.length;
+
+        document.getElementById("diffMutationCounter").textContent =
+          mutCount + " SCHEDULE" + (mutCount === 1 ? "" : "S") + " PHASE-SHIFTED";
+
+        // Colorize unified diff lines safely
+        diffPre.innerHTML = "";
+        const lines = state.diffBundle.diffText.split("\n");
+        lines.forEach((ln) => {
+          const div = document.createElement("div");
+          if (ln.startsWith("+") && !ln.startsWith("+++")) {
+            div.style.color = "#4ADE80";
+          } else if (ln.startsWith("-") && !ln.startsWith("---")) {
+            div.style.color = "#F87171";
+          } else if (ln.startsWith("@@")) {
+            div.style.color = "#60A5FA";
+          }
+          div.textContent = ln;
+          diffPre.appendChild(div);
+        });
+
+        optPre.textContent = state.diffBundle.optimizedText;
+      }
+
+      function renderRetryStorm() {
+        const st = state.stormReport;
+        document.getElementById("stormSpikeHeader").textContent =
+          st.spikeSlotLabel + " UTC // " + st.concurrentAtSpike + " CONCURRENT JOBS";
+        document.getElementById("stormNaiveAmp").textContent = st.ampNaive.toFixed(2) + "x";
+        document.getElementById("stormNaiveOverSec").textContent =
+          st.overSecNaive + " SECONDS OVER CIRCUIT BREAKER";
+        document.getElementById("stormDecorrAmp").textContent = st.ampDecorr.toFixed(2) + "x";
+        document.getElementById("stormDecorrOverSec").textContent =
+          st.overSecDecorr + " SECONDS OVER CIRCUIT BREAKER";
+
+        const canvas = document.getElementById("retryStormCanvas");
+        if (!canvas) return;
+        const rect = canvas.parentElement.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const width = Math.max(300, Math.floor(rect.width));
+        const height = Math.max(150, Math.floor(rect.height));
+
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        const ctx = canvas.getContext("2d");
+        ctx.scale(dpr, dpr);
+
+        const styles = getComputedStyle(document.documentElement);
+        const colGrid = styles.getPropertyValue("--canvas-grid").trim();
+        const colInkMuted = styles.getPropertyValue("--ink-muted").trim();
+        const colDanger = styles.getPropertyValue("--sig-danger").trim();
+        const colWarn = styles.getPropertyValue("--sig-warn").trim();
+        const colOk = styles.getPropertyValue("--sig-ok").trim();
+
+        ctx.clearRect(0, 0, width, height);
+
+        const padL = 42;
+        const padR = 14;
+        const padT = 14;
+        const padB = 24;
+        const plotW = width - padL - padR;
+        const plotH = height - padT - padB;
+
+        const maxQps = Math.max(
+          st.capacityQps * 1.4,
+          ...st.naiveSeries,
+          ...st.equalJitterSeries,
+          ...st.unherdDecorrSeries
+        ) * 1.08;
+
+        // Shade brownout window (t = 0 .. outageDurationSec)
+        const outageW = (st.outageDurationSec / (st.horizon - 1)) * plotW;
+        ctx.fillStyle = state.theme === "crt" ? "rgba(255,82,38,0.08)" : "rgba(212,56,28,0.07)";
+        ctx.fillRect(padL, padT, outageW, plotH);
+
+        // Grid lines
+        ctx.strokeStyle = colGrid;
+        ctx.lineWidth = 1;
+        ctx.font = "10px 'JetBrains Mono', monospace";
+        ctx.fillStyle = colInkMuted;
+        ctx.textAlign = "right";
+
+        for (let i = 0; i <= 3; i++) {
+          const val = (maxQps / 3) * (3 - i);
+          const y = padT + (plotH / 3) * i;
+          ctx.beginPath();
+          ctx.moveTo(padL, y);
+          ctx.lineTo(padL + plotW, y);
+          ctx.stroke();
+          ctx.fillText(val.toFixed(0), padL - 6, y + 3);
+        }
+
+        // X axis second ticks
+        ctx.textAlign = "center";
+        for (let s = 0; s < st.horizon; s += 10) {
+          const x = padL + (s / (st.horizon - 1)) * plotW;
+          ctx.fillText("t+" + s + "s", x, height - 7);
+        }
+
+        function xSec(s) {
+          return padL + (s / (st.horizon - 1)) * plotW;
+        }
+        function yQps(q) {
+          return padT + plotH - (Math.min(q, maxQps) / maxQps) * plotH;
+        }
+
+        // Circuit breaker horizontal threshold
+        const yCap = yQps(st.capacityQps);
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = colDanger;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(padL, yCap);
+        ctx.lineTo(padL + plotW, yCap);
+        ctx.stroke();
+        ctx.restore();
+
+        function drawCurve(series, color, lineWidth) {
+          ctx.beginPath();
+          for (let s = 0; s < st.horizon; s++) {
+            const x = xSec(s);
+            const y = yQps(series[s]);
+            if (s === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.strokeStyle = color;
+          ctx.lineWidth = lineWidth;
+          ctx.stroke();
+        }
+
+        drawCurve(st.naiveSeries, colDanger, 1.5);
+        drawCurve(st.equalJitterSeries, colWarn, 1.3);
+        drawCurve(st.unherdDecorrSeries, colOk, 2.1);
+      }
+
+      // =========================================================================
+      // 8. EVENT LISTENERS & INTERACTIVITY WIRING
+      // =========================================================================
+      function initEvents() {
+        // Theme Switcher
+        document.getElementById("btnToggleTheme").addEventListener("click", () => {
+          state.theme = state.theme === "paper" ? "crt" : "paper";
+          document.documentElement.setAttribute("data-theme", state.theme);
+          document.getElementById("themeLabel").textContent =
+            state.theme === "paper" ? "CHASSIS: PAPER" : "CHASSIS: CRT";
+          try {
+            localStorage.setItem("unherd_theme", state.theme);
+          } catch (_e) {}
+          renderOscilloscope();
+          renderRetryStorm();
+        });
+
+        // Hour-Shift Solver Toggle
+        document.getElementById("btnToggleHourShift").addEventListener("click", () => {
+          state.allowHourShift = !state.allowHourShift;
+          const btn = document.getElementById("btnToggleHourShift");
+          const ind = document.getElementById("hourShiftIndicator");
+          btn.querySelector("span:last-child").textContent =
+            state.allowHourShift ? "HOUR-SHIFT: ON" : "HOUR-SHIFT: OFF";
+          ind.style.backgroundColor = state.allowHourShift ? "var(--sig-ok)" : "transparent";
+          recomputeAll();
+          showToast(
+            state.allowHourShift
+              ? "HOUR-WINDOW PHASE SHIFTING ENABLED"
+              : "HOUR-WINDOW PHASE SHIFTING LOCKED"
+          );
+        });
+
+        // Re-run Solver Button
+        document.getElementById("btnRunOptimizer").addEventListener("click", () => {
+          state.traceMode = "overlay";
+          document.querySelectorAll(".trace-btn").forEach((b) => {
+            b.classList.toggle("hw-btn-active", b.dataset.trace === "overlay");
+          });
+          recomputeAll();
+          showToast(
+            "SOLVED: PEAK CONCURRENCY " +
+              state.optResult.beforeAnalysis.peakConcurrency +
+              " \u2192 " +
+              state.optResult.afterAnalysis.peakConcurrency +
+              " JOBS"
+          );
+        });
+
+        // Preset Fleet Buttons
+        document.querySelectorAll(".preset-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            loadPreset(btn.dataset.preset);
+            showToast("LOADED FIXTURE: " + btn.dataset.preset.toUpperCase());
+          });
+        });
+
+        // Trace Mode Buttons
+        document.querySelectorAll(".trace-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.traceMode = btn.dataset.trace;
+            document.querySelectorAll(".trace-btn").forEach((b) => {
+              b.classList.toggle("hw-btn-active", b === btn);
+            });
+            renderOscilloscope();
+            renderSlotInspector(state.selectedMinuteSlot);
+          });
+        });
+
+        // Zoom Range Buttons
+        document.querySelectorAll(".zoom-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.zoomRange = btn.dataset.zoom;
+            document.querySelectorAll(".zoom-btn").forEach((b) => {
+              b.classList.toggle("hw-btn-active", b === btn);
+            });
+            renderOscilloscope();
+          });
+        });
+
+        // Oscilloscope Mouse Scrubbing & Click
+        const oscCanvas = document.getElementById("oscilloscopeCanvas");
+        function handleOscPointer(evt) {
+          const rect = oscCanvas.getBoundingClientRect();
+          const padL = 42;
+          const padR = 14;
+          const plotW = Math.max(1, rect.width - padL - padR);
+          const relX = Math.max(0, Math.min(plotW, evt.clientX - rect.left - padL));
+          const visibleMins = getVisibleMinuteCount();
+          const slot = Math.round((relX / plotW) * (visibleMins - 1));
+          state.selectedMinuteSlot = slot;
+          state.selectedModuloMinute = slot % 60;
+          renderOscilloscope();
+          renderSlotInspector(slot);
+          renderModuloMatrix();
+        }
+        oscCanvas.addEventListener("mousemove", handleOscPointer);
+        oscCanvas.addEventListener("click", handleOscPointer);
+
+        // Modulo 60 Matrix Toggle
+        document.getElementById("btnToggleMatrixMode").addEventListener("click", () => {
+          state.matrixViewAfter = !state.matrixViewAfter;
+          renderModuloMatrix();
+        });
+
+        // Add Job Drawer Toggle & Form Submit
+        document.getElementById("btnAddJobToggle").addEventListener("click", () => {
+          const drawer = document.getElementById("addJobDrawer");
+          drawer.classList.toggle("hidden");
+        });
+
+        document.getElementById("addJobForm").addEventListener("submit", (evt) => {
+          evt.preventDefault();
+          const errEl = document.getElementById("addJobError");
+          errEl.classList.add("hidden");
+
+          const name = document.getElementById("inputNewJobName").value.trim() || "custom-job";
+          const cronStr = document.getElementById("inputNewJobCron").value.trim();
+          const weightVal = parseFloat(document.getElementById("inputNewJobWeight").value) || 1.5;
+
+          try {
+            const sched = parseCronExpression(cronStr);
+            const newIdx = state.jobs.length + 1;
+            state.jobs.push({
+              id: "job-" + String(newIdx).padStart(2, "0"),
+              name,
+              expression: sched.expression,
+              schedule: sched,
+              durationSec: 20,
+              weight: weightVal,
+              pinned: false,
+              sourceFormat: "crontab",
+              lineNumber: 0,
+              rawLine: sched.expression + " /srv/bin/" + name
+            });
+            recomputeAll();
+            showToast("INSERTED & PHASE-SOLVED: " + name.toUpperCase());
+          } catch (err) {
+            errEl.textContent = "PARSER ERROR: " + err.message;
+            errEl.classList.remove("hidden");
+          }
+        });
+
+        // Unlock All Pinned Jobs
+        document.getElementById("btnResetPinned").addEventListener("click", () => {
+          state.jobs.forEach((j) => {
+            j.pinned = false;
+          });
+          recomputeAll();
+          showToast("ALL SLA PINS UNLOCKED");
+        });
+
+        // Code Tabs (Diff / Raw Input / Optimized Output)
+        document.querySelectorAll(".codetab-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            state.activeCodeTab = btn.dataset.codetab;
+            document.querySelectorAll(".codetab-btn").forEach((b) => {
+              b.classList.toggle("hw-btn-active", b === btn);
+            });
+            document.getElementById("paneDiff").classList.toggle("hidden", state.activeCodeTab !== "diff");
+            document.getElementById("paneEditor").classList.toggle("hidden", state.activeCodeTab !== "editor");
+            document.getElementById("paneOptimized").classList.toggle("hidden", state.activeCodeTab !== "optimized");
+          });
+        });
+
+        // Parse Raw Config Button
+        document.getElementById("btnParseRawConfig").addEventListener("click", () => {
+          const text = document.getElementById("rawConfigTextarea").value;
+          const parsed = parseFleetConfig(text);
+          if (parsed.length === 0) {
+            showToast("NO VALID CRON OR YAML SCHEDULES DETECTED");
+            return;
+          }
+          state.rawConfigText = text;
+          state.jobs = parsed;
+          recomputeAll();
+          showToast("PARSED & OPTIMIZED " + parsed.length + " SCHEDULES");
+        });
+
+        // Copy Buffer Button
+        document.getElementById("btnCopyCode").addEventListener("click", () => {
+          let textToCopy = state.diffBundle.diffText;
+          if (state.activeCodeTab === "editor") {
+            textToCopy = document.getElementById("rawConfigTextarea").value;
+          } else if (state.activeCodeTab === "optimized") {
+            textToCopy = state.diffBundle.optimizedText;
+          }
+
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(textToCopy).then(
+              () => showToast("COPIED TO CLIPBOARD"),
+              () => fallbackCopy(textToCopy)
+            );
+          } else {
+            fallbackCopy(textToCopy);
+          }
+        });
+
+        // Download .patch file
+        document.getElementById("btnDownloadPatch").addEventListener("click", () => {
+          const blob = new Blob([state.diffBundle.diffText + "\n"], { type: "text/plain;charset=utf-8" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "unherd-" + state.activePreset + ".patch";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          showToast("DOWNLOADED UNIFIED DIFF .PATCH");
+        });
+
+        // Retry Storm Controls
+        const sliderOutage = document.getElementById("sliderOutageSec");
+        sliderOutage.addEventListener("input", () => {
+          state.outageDurationSec = parseInt(sliderOutage.value, 10) || 16;
+          document.getElementById("labelOutageSec").textContent = state.outageDurationSec + "s";
+          state.stormReport = simulateRetryStorm(
+            state.optResult,
+            state.outageDurationSec,
+            state.stormSeed
+          );
+          renderRetryStorm();
+        });
+
+        document.getElementById("btnResimulateStorm").addEventListener("click", () => {
+          state.stormSeed += 7;
+          state.stormReport = simulateRetryStorm(
+            state.optResult,
+            state.outageDurationSec,
+            state.stormSeed
+          );
+          renderRetryStorm();
+          showToast("RE-SIMULATED MONTE CARLO RETRY CASCADE");
+        });
+
+        window.addEventListener("resize", () => {
+          renderOscilloscope();
+          renderRetryStorm();
+        });
+      }
+
+      function fallbackCopy(text) {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand("copy");
+          showToast("COPIED TO CLIPBOARD");
+        } catch (_e) {
+          showToast("COPY FAILED");
+        }
+        document.body.removeChild(ta);
+      }
+
+      // Initialize on load
+      window.addEventListener("DOMContentLoaded", () => {
+        try {
+          const savedTheme = localStorage.getItem("unherd_theme");
+          if (savedTheme === "crt" || savedTheme === "paper") {
+            state.theme = savedTheme;
+            document.documentElement.setAttribute("data-theme", savedTheme);
+            document.getElementById("themeLabel").textContent =
+              savedTheme === "paper" ? "CHASSIS: PAPER" : "CHASSIS: CRT";
+          }
+        } catch (_e) {}
+
+        initEvents();
+        loadPreset("saas");
+      });
+    })();
+  </script>
+</body>
+</html>
